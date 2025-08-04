@@ -1,0 +1,14 @@
+.email-preview {
+    white-space: pre-wrap;
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    min-height: 300px;
+}
+
+.email-preview p {
+    margin-bottom: 1em;
+}

@@ -1,0 +1,70 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/build/
+backend/dist/
+backend/eggs/
+backend/.eggs/
+backend/lib/
+backend/lib64/
+backend/parts/
+backend/sdist/
+backend/var/
+backend/wheels/
+backend/*.egg-info/
+backend/.installed.cfg
+ 
+# Environment variables
+.env
+*/.env*
+ 
+# Database files
+*.db
+ 
+# Node.js / React
+frontend/node_modules/
+frontend/build/
+*debug.log*
+ 
+# IDE / Editor files
+.vscode/
+.idea/
+*.sw[po]
+*~
+ 
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+ 
+# Logs
+*.log
+logs/
+ 
+# Temporary files
+*.tmp
+*.temp
+*.egg
+*.swp
+*.swo
+ 
+# OS
+.DS_Store
+Thumbs.db
+ 
+# Logs
+*.log
+ 
+# Temporary files
+*.tmp
+*.temp
+*~
+ 
+ 
