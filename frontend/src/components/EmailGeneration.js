@@ -18,7 +18,34 @@ const EmailGeneration = ({ results }) => {
   const [isSending, setIsSending] = useState(false);
   const { sendEmail } = useApi();
  
-  if (!results || !results.participants || !results.personalized_emails) {
+  if (!results || !results.success) {
+    return null;
+  }
+
+  // For new API format, we don't have personalized emails yet
+  // We could implement this feature later or use the old endpoint
+  if (results.meeting_id !== undefined) {
+    return (
+      <Card className="main-card mb-4">
+        <Card.Header className="bg-white py-3">
+          <h5 className="mb-0">
+            <i className="fas fa-envelope me-2 text-primary"></i>
+            Email Generation
+          </h5>
+        </Card.Header>
+        <Card.Body>
+          <Alert variant="info">
+            <i className="fas fa-info-circle me-2"></i>
+            Email generation for the new meeting analysis format is coming soon. 
+            The meeting has been saved with ID: {results.meeting_id}
+          </Alert>
+        </Card.Body>
+      </Card>
+    );
+  }
+
+  // Handle old format for backward compatibility
+  if (!results.participants || !results.personalized_emails) {
     return null;
   }
 

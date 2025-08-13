@@ -10,15 +10,18 @@ const Home = () => {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { analyzeTranscript } = useApi();
+  const { analyzeTranscriptAjax } = useApi();
  
   const handleAnalyze = async (transcript) => {
     setIsLoading(true);
     setError(null);
     setResults(null);
- 
+
     try {
-      const data = await analyzeTranscript(transcript);
+      // Use the AJAX endpoint that returns participants and personalized emails
+      const data = await analyzeTranscriptAjax(transcript);
+      
+      console.log('API Response:', data); // Debug log
      
       if (data.success) {
         setResults(data);
@@ -41,9 +44,7 @@ const Home = () => {
     } finally {
       setIsLoading(false);
     }
-  };
- 
-  return (
+  };  return (
     <div>
       {/* Header */}
       <div className="app-header">

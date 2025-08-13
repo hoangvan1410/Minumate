@@ -6,19 +6,46 @@ const ApiContext = createContext();
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://your-production-domain.com'
   : 'http://localhost:8002';
+
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
  
 export const ApiProvider = ({ children }) => {
  
-  const analyzeTranscript = async (transcript) => {
+  const analyzeTranscript = async (transcript, meetingTitle = "Meeting Analysis", participants = []) => {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/api/analyze`, {
+        transcript,
+        meeting_title: meetingTitle,
+        participants
+      }, { headers });
+     
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing transcript:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to analyze transcript');
+    }
+  };
+
+  // Keep backward compatibility for the old AJAX endpoint
+  const analyzeTranscriptAjax = async (transcript) => {
     try {
       const formData = new FormData();
       formData.append('transcript', transcript);
      
-      const response = await axios.post(`${API_BASE_URL}/analyze_ajax`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const headers = {
+        ...getAuthHeaders()
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/analyze_ajax`, formData, { headers });
      
       return response.data;
     } catch (error) {
@@ -33,12 +60,12 @@ export const ApiProvider = ({ children }) => {
       Object.keys(emailData).forEach(key => {
         formData.append(key, emailData[key]);
       });
+
+      const headers = {
+        ...getAuthHeaders()
+      };
      
-      const response = await axios.post(`${API_BASE_URL}/send_email`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await axios.post(`${API_BASE_URL}/send_email`, formData, { headers });
      
       return response.data;
     } catch (error) {
@@ -90,6 +117,7 @@ export const ApiProvider = ({ children }) => {
  
   const value = {
     analyzeTranscript,
+    analyzeTranscriptAjax,
     sendEmail,
     getEmailStatus,
     getEmailsAdmin,

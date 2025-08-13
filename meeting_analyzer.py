@@ -278,64 +278,61 @@ class MeetingTranscriptAnalyzer:
             raise
    
     def generate_personalized_emails(self, meeting_summary: MeetingSummary, meeting_data: MeetingData) -> Dict[str, Dict[str, Any]]:
-        """Generate personalized emails for each participant based on their role."""
+        """Generate personalized emails for each participant with consistent summary content."""
         emails = {}
         participants_data = getattr(meeting_data, 'participants_data', [])
+        
+        # Generate consistent base content that will be the same for all participants
+        key_decisions = format_bullet_points(meeting_summary.key_decisions)
+        action_items = format_action_items(meeting_summary.action_items)
+        next_steps = format_bullet_points(meeting_summary.next_steps)
+        
+        # Create a consistent base email content that's the same for everyone
+        base_content = f"""Subject: Follow-Up on {meeting_data.title}
+
+Dear [NAME],
+
+I hope this email finds you well. I wanted to follow up on our {meeting_data.date} meeting to ensure everyone is aligned on the key outcomes and next steps.
+
+**Meeting Summary:**
+{meeting_summary.executive_summary}
+
+**Key Decisions Made:**
+{key_decisions}
+
+**Action Items:**
+{action_items}
+
+**Next Steps:**
+{next_steps}
+
+Please let me know if you have any questions or need clarification on any of these points. Looking forward to our continued collaboration.
+
+Best regards,
+Meeting Organizer"""
        
         for participant in participants_data:
             name = participant.get("name", "Unknown")
             role = participant.get("role", "Participant")
             email_preference = participant.get("email_preference", "team")
-           
-            content_style = get_content_focus_and_tone(email_preference, name)
-            key_decisions = format_bullet_points(meeting_summary.key_decisions)
-            action_items = format_action_items(meeting_summary.action_items)
-            next_steps = format_bullet_points(meeting_summary.next_steps)
             
-            email_prompt = PERSONALIZED_EMAIL_PROMPT.format(
-                name=name,
-                role=role,
-                email_preference=email_preference,
-                content_focus=content_style["content_focus"],
-                tone=content_style["tone"],
-                title=meeting_data.title,
-                date=meeting_data.date,
-                executive_summary=meeting_summary.executive_summary,
-                key_decisions=key_decisions,
-                action_items=action_items,
-                next_steps=next_steps
-            )
- 
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": "You are a professional communication specialist creating personalized business emails."},
-                        {"role": "user", "content": email_prompt}
-                    ],
-                    max_tokens=800,
-                    temperature=0.3
-                )
-               
-                email_content = response.choices[0].message.content.strip()
-               
-                emails[name] = {
-                    "content": email_content,
-                    "role": role,
-                    "email_type": email_preference,
-                    "participant_data": participant
-                }
-               
-            except Exception as e:
-                print(f"❌ Error generating email for {name}: {e}")
-                emails[name] = {
-                    "content": f"Error generating personalized email for {name}. Please try again.",
-                    "role": role,
-                    "email_type": email_preference,
-                    "participant_data": participant
-                }
+            # Replace placeholder with actual name - this is the only personalization
+            personalized_content = base_content.replace("[NAME]", name)
+            
+            # Extract subject and content
+            lines = personalized_content.split('\n')
+            subject = lines[0].replace("Subject: ", "")
+            content = '\n'.join(lines[2:])  # Skip subject line and empty line
+            
+            emails[name] = {
+                "subject": subject,
+                "content": content,
+                "role": role,
+                "email_type": email_preference,
+                "participant_data": participant
+            }
        
-        print(f"✅ Generated {len(emails)} personalized emails")
+        print(f"✅ Generated {len(emails)} consistent emails")
         return emails
    
     def generate_stakeholder_email(self, meeting_summary: MeetingSummary,

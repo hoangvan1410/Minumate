@@ -20,6 +20,53 @@ code {
   margin-bottom: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
+
+/* Auth Page Styling */
+.auth-card {
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.auth-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-align: center;
+  padding: 1.5rem;
+}
+
+/* User Dashboard Styling */
+.dashboard-card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.task-card {
+  border-left: 4px solid #667eea;
+  background: linear-gradient(45deg, #f8f9fa, #ffffff);
+}
+
+.task-card.completed {
+  border-left-color: #28a745;
+}
+
+.task-card.in-progress {
+  border-left-color: #ffc107;
+}
+
+/* Navbar Styling */
+.navbar-custom {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
  
 .main-card {
   border: none;

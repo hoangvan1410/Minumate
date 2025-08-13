@@ -1,29 +1,39 @@
-"""FastAPI web interface for meeting transcript analysis and email generation."""
+"""FastAPI web interface for meeting transcript analysis and email generation with JWT authentication."""
 
-from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Depends, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer
 import os
 from pathlib import Path
 from typing import Optional, List
 from dotenv import load_dotenv
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import sendgrid
 from sendgrid.helpers.mail import Mail, TrackingSettings, ClickTracking, OpenTracking
- 
+
 # Load environment variables from .env file
 load_dotenv()
- 
+
 from meeting_analyzer import MeetingTranscriptAnalyzer, MeetingData, EmailType
 from database import EmailTrackingDB
+from auth import (
+    verify_password, get_password_hash, create_access_token, 
+    get_current_user, get_admin_user, UserRole, create_default_admin_if_not_exists
+)
+from user_db import UserDB
+from models import (
+    UserRegister, UserLogin, Token, TranscriptAnalysis, 
+    MeetingCreate, TaskUpdate, AnalysisResponse
+)
 import uvicorn
  
 # Create FastAPI app
 app = FastAPI(title="AI Meeting Transcript Analyzer", version="1.0.0")
- 
+
 # Add CORS middleware for React development
 app.add_middleware(
     CORSMiddleware,
@@ -32,18 +42,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
- 
+
 # Create directories for static files
 Path("static").mkdir(exist_ok=True)
- 
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
- 
+
 # Mount React build files (if they exist)
 react_build_path = Path("frontend/build")
 if react_build_path.exists():
     app.mount("/react", StaticFiles(directory="frontend/build/static"), name="react-static")
- 
+
+# Initialize databases
+db = EmailTrackingDB()
+user_db = UserDB()
+print("✅ SQLite databases initialized successfully")
+
+# Create default admin user if no users exist
+create_default_admin_if_not_exists(user_db)
+
 # Initialize the analyzer
 # Try real API connection, show error if it fails
 try:
@@ -77,11 +95,120 @@ else:
     print("⚠️ SendGrid API key not found - email sending will be disabled")
  
 # Initialize database for email tracking
-db = EmailTrackingDB()
 print("✅ SQLite database initialized successfully")
- 
+
 # Store sent emails for tracking (keeping for backward compatibility)
 sent_emails = {}
+
+# Authentication endpoints
+@app.post("/api/auth/register", response_model=Token)
+async def register(user_data: UserRegister):
+    """Register a new user."""
+    # Check if username or email already exists
+    existing_user = user_db.get_user_by_username(user_data.username)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    existing_email = user_db.get_user_by_email(user_data.email)
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Hash password and create user
+    hashed_password = get_password_hash(user_data.password)
+    user_dict = {
+        "username": user_data.username,
+        "email": user_data.email,
+        "password": hashed_password,
+        "full_name": user_data.full_name,
+        "role": user_data.role,
+        "is_active": True
+    }
+    
+    user_id = user_db.create_user(user_dict)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user"
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(
+        data={"sub": user_data.username, "user_id": user_id, "role": user_data.role},
+        expires_delta=access_token_expires
+    )
+    
+    user_info = {
+        "id": user_id,
+        "username": user_data.username,
+        "email": user_data.email,
+        "full_name": user_data.full_name,
+        "role": user_data.role
+    }
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_info
+    }
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(user_data: UserLogin):
+    """Authenticate user and return JWT token."""
+    user = user_db.get_user_by_username(user_data.username)
+    
+    if not user or not verify_password(user_data.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(
+        data={"sub": user["username"], "user_id": user["id"], "role": user["role"]},
+        expires_delta=access_token_expires
+    )
+    
+    user_info = {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "role": user["role"]
+    }
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_info
+    }
+
+@app.get("/api/auth/me")
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current user information."""
+    user = user_db.get_user_by_username(current_user["username"])
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "role": user["role"],
+        "is_active": user["is_active"]
+    }
  
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -123,9 +250,128 @@ async def home(request: Request):
         </html>
         """)
  
+# Meeting analysis endpoints (Admin only)
+@app.post("/api/analyze", response_model=AnalysisResponse)
+async def analyze_meeting_transcript(
+    analysis_data: TranscriptAnalysis,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Analyze meeting transcript (Admin only) and save to database."""
+    
+    # Check if API is available
+    if analyzer is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"OpenAI API is not available: {API_ERROR}"
+        )
+    
+    try:
+        # Create meeting data object
+        meeting_data = MeetingData(transcript=analysis_data.transcript)
+        
+        print("🔍 Processing transcript length:", len(analysis_data.transcript))
+        
+        # Analyze the meeting
+        meeting_summary = analyzer.analyze_transcript(meeting_data)
+        
+        print("✅ Meeting analysis complete")
+        
+        # Create meeting in database
+        meeting_record = {
+            "title": analysis_data.meeting_title,
+            "description": "Meeting analyzed by AI",
+            "transcript": analysis_data.transcript,
+            "analysis_result": json.dumps({
+                "executive_summary": meeting_summary.executive_summary,
+                "key_decisions": meeting_summary.key_decisions,
+                "action_items": [
+                    {
+                        "task": item.task,
+                        "owner": item.owner,
+                        "due_date": item.due_date,
+                        "priority": item.priority,
+                        "status": item.status
+                    } for item in meeting_summary.action_items
+                ],
+                "next_steps": meeting_summary.next_steps,
+                "risks_concerns": meeting_summary.risks_concerns
+            })
+        }
+        
+        meeting_id = user_db.create_meeting(meeting_record, current_user["user_id"])
+        
+        if not meeting_id:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save meeting analysis"
+            )
+        
+        # Add participants to meeting
+        for participant_id in analysis_data.participants:
+            user_db.add_meeting_participant(meeting_id, participant_id, "participant")
+        
+        # Create tasks from action items
+        created_tasks = []
+        for item in meeting_summary.action_items:
+            # Try to find user by name (simplified matching)
+            assigned_user = None
+            if item.owner:
+                users = user_db.get_all_users()
+                for user in users:
+                    if item.owner.lower() in user["full_name"].lower():
+                        assigned_user = user["id"]
+                        break
+            
+            task_data = {
+                "meeting_id": meeting_id,
+                "assigned_to": assigned_user,
+                "title": item.task,
+                "description": f"Priority: {item.priority}",
+                "due_date": item.due_date,
+                "status": "pending"
+            }
+            
+            task_id = user_db.create_task(task_data)
+            if task_id:
+                created_tasks.append({
+                    "id": task_id,
+                    "title": item.task,
+                    "assigned_to": assigned_user,
+                    "due_date": item.due_date
+                })
+        
+        return AnalysisResponse(
+            success=True,
+            meeting_id=meeting_id,
+            summary=meeting_summary.executive_summary,
+            key_points=meeting_summary.key_decisions,
+            action_items=[
+                {
+                    "task": item.task,
+                    "owner": item.owner,
+                    "due_date": item.due_date,
+                    "priority": item.priority,
+                    "status": item.status
+                } for item in meeting_summary.action_items
+            ],
+            next_steps=meeting_summary.next_steps
+        )
+        
+    except Exception as e:
+        print(f"Error analyzing transcript: {e}")
+        return AnalysisResponse(
+            success=False,
+            error=f"Error processing transcript: {str(e)}"
+        )
+
+# Keep the old endpoint for backward compatibility (but require authentication)
 @app.post("/analyze_ajax")
-async def analyze_meeting_ajax(request: Request, transcript: str = Form(...)):
-    """AJAX endpoint to analyze meeting transcript and return JSON results."""
+async def analyze_meeting_ajax(
+    request: Request, 
+    transcript: str = Form(...),
+    current_user: dict = Depends(get_admin_user)
+):
+    """AJAX endpoint to analyze meeting transcript and return JSON results (Admin only)."""
    
     # Check if API is available
     if analyzer is None:
@@ -492,6 +738,96 @@ async def cleanup_old_emails(days: int):
     return JSONResponse(content={
         "message": f"Deleted {deleted_count} emails older than {days} days"
     })
+
+# User dashboard endpoints
+@app.get("/api/user/meetings")
+async def get_user_meetings(current_user: dict = Depends(get_current_user)):
+    """Get meetings for the current user."""
+    meetings = user_db.get_user_meetings(current_user["user_id"])
+    return {"meetings": meetings}
+
+@app.get("/api/user/tasks")
+async def get_user_tasks(current_user: dict = Depends(get_current_user)):
+    """Get tasks assigned to the current user."""
+    tasks = user_db.get_user_tasks(current_user["user_id"])
+    return {"tasks": tasks}
+
+@app.put("/api/user/tasks/{task_id}")
+async def update_task_status(
+    task_id: int,
+    task_update: TaskUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update task status (only for assigned user)."""
+    success = user_db.update_task_status(task_id, task_update.status, current_user["user_id"])
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found or you don't have permission to update it"
+        )
+    return {"message": "Task status updated successfully"}
+
+@app.get("/api/user/meetings/{meeting_id}")
+async def get_meeting_details(
+    meeting_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get meeting details for a user (only if they're a participant)."""
+    # Check if user is a participant in this meeting
+    user_meetings = user_db.get_user_meetings(current_user["user_id"])
+    meeting_ids = [m["id"] for m in user_meetings]
+    
+    if meeting_id not in meeting_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have access to this meeting"
+        )
+    
+    # Get meeting details (you'll need to add this method to user_db)
+    # For now, return basic info
+    meeting = next((m for m in user_meetings if m["id"] == meeting_id), None)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    return {"meeting": meeting}
+
+# Admin endpoints
+@app.get("/api/admin/users")
+async def get_all_users(current_user: dict = Depends(get_admin_user)):
+    """Get all users (Admin only)."""
+    users = user_db.get_all_users()
+    return {"users": users}
+
+@app.get("/api/admin/meetings")
+async def get_all_meetings(current_user: dict = Depends(get_admin_user)):
+    """Get all meetings (Admin only)."""
+    # You'll need to implement this in user_db
+    return {"meetings": []}
+
+@app.post("/api/admin/meetings")
+async def create_meeting(
+    meeting_data: MeetingCreate,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Create a new meeting (Admin only)."""
+    meeting_record = {
+        "title": meeting_data.title,
+        "description": meeting_data.description,
+        "transcript": meeting_data.transcript
+    }
+    
+    meeting_id = user_db.create_meeting(meeting_record, current_user["user_id"])
+    if not meeting_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create meeting"
+        )
+    
+    # Add participants
+    for participant_id in meeting_data.participants:
+        user_db.add_meeting_participant(meeting_id, participant_id, "participant")
+    
+    return {"meeting_id": meeting_id, "message": "Meeting created successfully"}
  
 if __name__ == "__main__":    
     print("\n🚀 Starting Meeting Transcript Analyzer")

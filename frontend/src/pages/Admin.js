@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Button, Form, Badge, Modal, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Button, Form, Badge, Modal, Alert, Tabs, Tab } from 'react-bootstrap';
 import { useApi } from '../contexts/ApiContext';
 import { toast } from 'react-toastify';
 import moment from 'moment';
+import EmailComposer from '../components/EmailComposer';
  
 const Admin = () => {
   const [emails, setEmails] = useState([]);
@@ -89,11 +90,11 @@ const Admin = () => {
           <div className="row align-items-center">
             <div className="col-md-8">
               <h1 className="mb-0">
-                <i className="fas fa-chart-line me-3"></i>
-                Email Analytics
+                <i className="fas fa-cogs me-3"></i>
+                Admin Dashboard
               </h1>
               <p className="mb-0 mt-2 opacity-75">
-                Track email performance
+                Email management and analytics
               </p>
             </div>
             <div className="col-md-4 text-end">
@@ -107,45 +108,51 @@ const Admin = () => {
       </div>
  
       <Container>
-        {/* Statistics Cards */}
-        <Row className="mb-4">
-          <Col md={3}>
-            <StatCard
-              title="Total Emails"
-              value={stats.total_emails || 0}
-              icon="fa-envelope"
-              color="primary"
-            />
-          </Col>
-          <Col md={3}>
-            <StatCard
-              title="Opened"
-              value={stats.opened_emails || 0}
-              icon="fa-envelope-open"
-              color="success"
-              subtitle={`${stats.open_rate?.toFixed(1) || 0}%`}
-            />
-          </Col>
-          <Col md={3}>
-            <StatCard
-              title="Clicked"
-              value={stats.clicked_emails || 0}
-              icon="fa-mouse-pointer"
-              color="warning"
-              subtitle={`${stats.click_rate?.toFixed(1) || 0}%`}
-            />
-          </Col>
-          <Col md={3}>
-            <StatCard
-              title="Last 24 Hours"
-              value={stats.recent_emails || 0}
-              icon="fa-clock"
-              color="info"
-            />
-          </Col>
-        </Row>
- 
-        {/* Filters */}
+        <Tabs defaultActiveKey="compose" className="mb-4">
+          <Tab eventKey="compose" title={<><i className="fas fa-edit me-2"></i>Compose Email</>}>
+            <EmailComposer />
+          </Tab>
+          
+          <Tab eventKey="analytics" title={<><i className="fas fa-chart-line me-2"></i>Email Analytics</>}>
+            {/* Statistics Cards */}
+            <Row className="mb-4">
+              <Col md={3}>
+                <StatCard
+                  title="Total Emails"
+                  value={stats.total_emails || 0}
+                  icon="fa-envelope"
+                  color="primary"
+                />
+              </Col>
+              <Col md={3}>
+                <StatCard
+                  title="Opened"
+                  value={stats.opened_emails || 0}
+                  icon="fa-envelope-open"
+                  color="success"
+                  subtitle={`${stats.open_rate?.toFixed(1) || 0}%`}
+                />
+              </Col>
+              <Col md={3}>
+                <StatCard
+                  title="Clicked"
+                  value={stats.clicked_emails || 0}
+                  icon="fa-mouse-pointer"
+                  color="warning"
+                  subtitle={`${stats.click_rate?.toFixed(1) || 0}%`}
+                />
+              </Col>
+              <Col md={3}>
+                <StatCard
+                  title="Last 24 Hours"
+                  value={stats.recent_emails || 0}
+                  icon="fa-clock"
+                  color="info"
+                />
+              </Col>
+            </Row>
+
+            {/* Filters */}
         <Card className="main-card mb-4">
           <Card.Body>
             <Row>
@@ -286,6 +293,19 @@ const Admin = () => {
             No emails found. Try adjusting your filters or send some emails first.
           </Alert>
         )}
+          </Tab>
+        </Tabs>
+
+        {/* Floating Action Button */}
+        <Button
+          variant="primary"
+          className="floating-action-btn"
+          onClick={loadEmails}
+          disabled={loading}
+          title="Refresh Data"
+        >
+          <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
+        </Button>
       </Container>
  
       {/* Email Details Modal */}
@@ -355,22 +375,16 @@ const Admin = () => {
             </Row>
           )}
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
       </Modal>
- 
-      {/* Floating Refresh Button */}
-      <Button
-        variant="primary"
-        className="floating-action-btn"
-        onClick={loadEmails}
-        disabled={loading}
-        title="Refresh Data"
-      >
-        <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
-      </Button>
     </div>
   );
 };
- 
+
 export default Admin;
  
  
