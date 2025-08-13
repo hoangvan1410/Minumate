@@ -66,6 +66,119 @@ code {
 .navbar-custom {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 0.75rem 0;
+}
+
+.navbar-custom .navbar-nav {
+  align-items: center;
+}
+
+.navbar-custom .container {
+  display: flex;
+  align-items: center;
+}
+
+/* Navigation Item Spacing */
+.nav-item-spacing {
+  margin: 0 0.5rem;
+  padding: 0.5rem 1rem !important;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+}
+
+.nav-item-spacing:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+/* User Dropdown Styling */
+.user-dropdown .dropdown-toggle {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 25px !important;
+  padding: 0.5rem 1rem !important;
+  color: white !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  min-width: fit-content;
+}
+
+.user-dropdown .dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-dropdown .dropdown-toggle::after {
+  margin-left: 0.75rem;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.user-dropdown-title {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Dropdown Menu Styling */
+.user-dropdown .dropdown-menu {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  padding: 0;
+  margin-top: 0.5rem;
+  min-width: 250px;
+  z-index: 9999 !important;
+  position: absolute !important;
+}
+
+.user-dropdown {
+  position: relative;
+  z-index: 1000;
+}
+
+.user-info-item {
+  padding: 1.5rem 1rem !important;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-bottom: 1px solid #dee2e6;
+}
+
+.user-info-item:hover {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+}
+
+.user-avatar {
+  margin-bottom: 0.5rem;
+}
+
+.dropdown-item {
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.dropdown-item:hover {
+  background: #f8f9fa;
+  color: #495057;
+  transform: translateX(5px);
+}
+
+.logout-item {
+  color: #dc3545 !important;
+  font-weight: 600;
+}
+
+.logout-item:hover {
+  background: rgba(220, 53, 69, 0.1) !important;
+  color: #dc3545 !important;
 }
  
 .main-card {

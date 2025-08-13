@@ -210,16 +210,6 @@ const AuthPage = () => {
                   )}
                 </Button>
               </Form>
-
-              {isLogin && (
-                <div className="mt-3 text-center">
-                  <small className="text-muted">
-                    Default admin credentials: <br />
-                    Username: <code>admin</code> <br />
-                    Password: <code>admin123</code>
-                  </small>
-                </div>
-              )}
             </Card.Body>
           </Card>
         </Col>

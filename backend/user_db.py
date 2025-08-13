@@ -27,11 +27,19 @@ class UserDB:
                 password_hash TEXT NOT NULL,
                 full_name TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'user',
+                status TEXT NOT NULL DEFAULT 'registered',  -- 'created', 'registered'
                 is_active BOOLEAN NOT NULL DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Add status column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT "registered"')
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
 
         # Create meetings table
         cursor.execute('''
@@ -98,14 +106,15 @@ class UserDB:
             cursor = conn.cursor()
 
             cursor.execute('''
-                INSERT INTO users (username, email, password_hash, full_name, role, is_active)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO users (username, email, password_hash, full_name, role, status, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 user_data['username'],
                 user_data['email'],
                 user_data['password'],  # Should already be hashed
                 user_data['full_name'],
                 user_data.get('role', 'user'),
+                user_data.get('status', 'registered'),
                 user_data.get('is_active', True)
             ))
 
@@ -120,13 +129,44 @@ class UserDB:
             return None
 
     def get_user_by_username(self, username: str) -> Optional[Dict]:
-        """Get user by username."""
+        """Get user by username (only registered users)."""
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
 
             cursor.execute('''
-                SELECT id, username, email, password_hash, full_name, role, is_active, created_at
+                SELECT id, username, email, password_hash, full_name, role, status, is_active, created_at
+                FROM users WHERE username = ? AND status = 'registered' AND is_active = 1
+            ''', (username,))
+
+            row = cursor.fetchone()
+            conn.close()
+
+            if row:
+                return {
+                    'id': row[0],
+                    'username': row[1],
+                    'email': row[2],
+                    'password_hash': row[3],
+                    'full_name': row[4],
+                    'role': row[5],
+                    'status': row[6],
+                    'is_active': row[7],
+                    'created_at': row[8]
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting user: {e}")
+            return None
+
+    def get_user_by_username_any_status(self, username: str) -> Optional[Dict]:
+        """Get user by username regardless of status."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, username, email, password_hash, full_name, role, status, is_active, created_at
                 FROM users WHERE username = ? AND is_active = 1
             ''', (username,))
 
@@ -141,8 +181,9 @@ class UserDB:
                     'password_hash': row[3],
                     'full_name': row[4],
                     'role': row[5],
-                    'is_active': row[6],
-                    'created_at': row[7]
+                    'status': row[6],
+                    'is_active': row[7],
+                    'created_at': row[8]
                 }
             return None
         except Exception as e:
@@ -150,14 +191,14 @@ class UserDB:
             return None
 
     def get_user_by_email(self, email: str) -> Optional[Dict]:
-        """Get user by email."""
+        """Get user by email (only registered users)."""
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
 
             cursor.execute('''
-                SELECT id, username, email, password_hash, full_name, role, is_active, created_at
-                FROM users WHERE email = ? AND is_active = 1
+                SELECT id, username, email, password_hash, full_name, role, status, is_active, created_at
+                FROM users WHERE email = ? AND status = 'registered' AND is_active = 1
             ''', (email,))
 
             row = cursor.fetchone()
@@ -171,8 +212,9 @@ class UserDB:
                     'password_hash': row[3],
                     'full_name': row[4],
                     'role': row[5],
-                    'is_active': row[6],
-                    'created_at': row[7]
+                    'status': row[6],
+                    'is_active': row[7],
+                    'created_at': row[8]
                 }
             return None
         except Exception as e:
@@ -206,6 +248,111 @@ class UserDB:
         except Exception as e:
             print(f"Error getting all users: {e}")
             return []
+
+    def create_user_from_email(self, email: str, full_name: str) -> Optional[int]:
+        """Create a user with 'created' status when sending meeting emails."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Use email as username
+            username = email
+            
+            # Check if user already exists
+            existing_user = self.get_user_by_email_any_status(email)
+            if existing_user:
+                return existing_user['id']
+
+            cursor.execute('''
+                INSERT INTO users (username, email, password_hash, full_name, role, status, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                username,
+                email,
+                '',  # No password hash yet - will be set when user registers
+                full_name,
+                'user',
+                'created',
+                True
+            ))
+
+            user_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return user_id
+        except sqlite3.IntegrityError as e:
+            print(f"Error creating user from email (IntegrityError): {e}")
+            # Email already exists, return None to indicate failure
+            return None
+        except Exception as e:
+            print(f"Error creating user from email: {e}")
+            return None
+
+    def update_user_status_to_registered(self, email: str, password_hash: str, username: str = None, full_name: str = None) -> bool:
+        """Update user status from 'created' to 'registered' when user registers."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Build dynamic update query
+            update_fields = ['password_hash = ?', 'status = "registered"', 'updated_at = CURRENT_TIMESTAMP']
+            params = [password_hash]
+            
+            if username:
+                update_fields.append('username = ?')
+                params.append(username)
+            
+            if full_name:
+                update_fields.append('full_name = ?')
+                params.append(full_name)
+            
+            params.append(email)  # for WHERE clause
+            
+            query = f'''
+                UPDATE users 
+                SET {', '.join(update_fields)}
+                WHERE email = ? AND status = 'created'
+            '''
+            
+            cursor.execute(query, params)
+            updated = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return updated
+        except Exception as e:
+            print(f"Error updating user status: {e}")
+            return False
+
+    def get_user_by_email_any_status(self, email: str) -> Optional[Dict]:
+        """Get user by email regardless of status (for checking existence)."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, username, email, password_hash, full_name, role, status, is_active, created_at
+                FROM users WHERE email = ? AND is_active = 1
+            ''', (email,))
+
+            row = cursor.fetchone()
+            conn.close()
+
+            if row:
+                return {
+                    'id': row[0],
+                    'username': row[1],
+                    'email': row[2],
+                    'password_hash': row[3],
+                    'full_name': row[4],
+                    'role': row[5],
+                    'status': row[6],
+                    'is_active': row[7],
+                    'created_at': row[8]
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting user by email: {e}")
+            return None
 
     def create_meeting(self, meeting_data: Dict, creator_id: int) -> Optional[int]:
         """Create a new meeting."""
@@ -361,4 +508,328 @@ class UserDB:
             return success
         except Exception as e:
             print(f"Error updating task status: {e}")
+            return False
+
+    def get_all_meetings(self) -> List[Dict]:
+        """Get all meetings with creator and participant information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT m.id, m.title, m.description, m.transcript, m.created_by, 
+                       m.created_at, u.full_name as creator_name,
+                       COUNT(mp.user_id) as participant_count
+                FROM meetings m
+                LEFT JOIN users u ON m.created_by = u.id
+                LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id
+                GROUP BY m.id, m.title, m.description, m.transcript, m.created_by, 
+                         m.created_at, u.full_name
+                ORDER BY m.created_at DESC
+            ''')
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'transcript': row[3],
+                'creator_id': row[4],
+                'created_at': row[5],
+                'creator_name': row[6],
+                'participant_count': row[7]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting all meetings: {e}")
+            return []
+
+    def get_meeting_by_id(self, meeting_id: int) -> Optional[Dict]:
+        """Get meeting by ID with participants."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Get meeting details
+            cursor.execute('''
+                SELECT m.id, m.title, m.description, m.transcript, m.created_by, 
+                       m.created_at, u.full_name as creator_name
+                FROM meetings m
+                LEFT JOIN users u ON m.created_by = u.id
+                WHERE m.id = ?
+            ''', (meeting_id,))
+
+            meeting_row = cursor.fetchone()
+            if not meeting_row:
+                conn.close()
+                return None
+
+            # Get participants
+            cursor.execute('''
+                SELECT u.id, u.full_name, u.email, mp.role
+                FROM meeting_participants mp
+                JOIN users u ON mp.user_id = u.id
+                WHERE mp.meeting_id = ?
+            ''', (meeting_id,))
+
+            participants = cursor.fetchall()
+            conn.close()
+
+            return {
+                'id': meeting_row[0],
+                'title': meeting_row[1],
+                'description': meeting_row[2],
+                'transcript': meeting_row[3],
+                'creator_id': meeting_row[4],
+                'created_at': meeting_row[5],
+                'creator_name': meeting_row[6],
+                'participants': [{
+                    'id': p[0],
+                    'full_name': p[1],
+                    'email': p[2],
+                    'role': p[3]
+                } for p in participants]
+            }
+        except Exception as e:
+            print(f"Error getting meeting by ID: {e}")
+            return None
+
+    def update_user(self, user_id: int, user_data: Dict) -> bool:
+        """Update user information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Build update query dynamically based on provided fields
+            update_fields = []
+            values = []
+            
+            for field in ['username', 'email', 'full_name', 'role', 'status', 'is_active']:
+                if field in user_data:
+                    update_fields.append(f"{field} = ?")
+                    values.append(user_data[field])
+            
+            if not update_fields:
+                return False
+
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(user_id)
+
+            query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, values)
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error updating user: {e}")
+            return False
+
+    def delete_user(self, user_id: int) -> bool:
+        """Delete user and related data."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Delete user's tasks
+            cursor.execute('DELETE FROM tasks WHERE assigned_to = ?', (user_id,))
+            
+            # Delete user's meeting participations
+            cursor.execute('DELETE FROM meeting_participants WHERE user_id = ?', (user_id,))
+            
+            # Delete meetings created by user
+            cursor.execute('DELETE FROM meetings WHERE created_by = ?', (user_id,))
+            
+            # Delete user
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error deleting user: {e}")
+            return False
+
+    def update_meeting(self, meeting_id: int, meeting_data: Dict) -> bool:
+        """Update meeting information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Build update query dynamically based on provided fields
+            update_fields = []
+            values = []
+            
+            for field in ['title', 'description', 'transcript']:
+                if field in meeting_data:
+                    update_fields.append(f"{field} = ?")
+                    values.append(meeting_data[field])
+            
+            if not update_fields:
+                return False
+
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(meeting_id)
+
+            query = f"UPDATE meetings SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, values)
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error updating meeting: {e}")
+            return False
+
+    def delete_meeting(self, meeting_id: int) -> bool:
+        """Delete meeting and related data."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Delete meeting tasks
+            cursor.execute('DELETE FROM tasks WHERE meeting_id = ?', (meeting_id,))
+            
+            # Delete meeting participants
+            cursor.execute('DELETE FROM meeting_participants WHERE meeting_id = ?', (meeting_id,))
+            
+            # Delete meeting
+            cursor.execute('DELETE FROM meetings WHERE id = ?', (meeting_id,))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error deleting meeting: {e}")
+            return False
+
+    def remove_meeting_participant(self, meeting_id: int, user_id: int) -> bool:
+        """Remove participant from meeting."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                DELETE FROM meeting_participants 
+                WHERE meeting_id = ? AND user_id = ?
+            ''', (meeting_id, user_id))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error removing meeting participant: {e}")
+            return False
+
+    def assign_task_to_user(self, task_id: int, user_id: int) -> bool:
+        """Assign a task to a specific user."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                UPDATE tasks SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (user_id, task_id))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error assigning task to user: {e}")
+            return False
+
+    def get_meeting_tasks(self, meeting_id: int) -> List[Dict]:
+        """Get all tasks for a specific meeting."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT t.id, t.title, t.description, t.assigned_to, t.due_date, t.status, 
+                       t.created_at, u.full_name as assigned_name
+                FROM tasks t
+                LEFT JOIN users u ON t.assigned_to = u.id
+                WHERE t.meeting_id = ?
+                ORDER BY t.created_at DESC
+            ''', (meeting_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'assigned_to': row[3],
+                'due_date': row[4],
+                'status': row[5],
+                'created_at': row[6],
+                'assigned_name': row[7]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting meeting tasks: {e}")
+            return []
+
+    def get_user_assigned_tasks(self, user_id: int) -> List[Dict]:
+        """Get all tasks assigned to a specific user with meeting information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT t.id, t.title, t.description, t.due_date, t.status, 
+                       t.created_at, t.updated_at, m.title as meeting_title,
+                       m.id as meeting_id, m.created_at as meeting_date
+                FROM tasks t
+                JOIN meetings m ON t.meeting_id = m.id
+                WHERE t.assigned_to = ?
+                ORDER BY t.due_date ASC, t.created_at DESC
+            ''', (user_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'due_date': row[3],
+                'status': row[4],
+                'created_at': row[5],
+                'updated_at': row[6],
+                'meeting_title': row[7],
+                'meeting_id': row[8],
+                'meeting_date': row[9]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting user assigned tasks: {e}")
+            return []
+
+    def update_user_email(self, user_id: int, new_email: str) -> bool:
+        """Update user's email address (used when converting placeholder to real user)."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Update email and username to the new email
+            cursor.execute('''
+                UPDATE users 
+                SET email = ?, username = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (new_email, new_email, user_id))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error updating user email: {e}")
             return False

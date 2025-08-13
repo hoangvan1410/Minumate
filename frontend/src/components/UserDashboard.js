@@ -17,23 +17,37 @@ const UserDashboard = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      console.log('🔑 Loading user data with token:', token?.substring(0, 20) + '...');
+      
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       };
 
       // Load user meetings
-      const meetingsResponse = await fetch('/api/user/meetings', { headers });
+      console.log('📅 Fetching user meetings...');
+      const meetingsResponse = await fetch('http://localhost:8002/api/user/meetings', { headers });
+      console.log('📅 Meetings response status:', meetingsResponse.status);
+      
       if (meetingsResponse.ok) {
         const meetingsData = await meetingsResponse.json();
+        console.log('📅 Meetings data:', meetingsData);
         setMeetings(meetingsData.meetings);
+      } else {
+        console.error('📅 Failed to fetch meetings:', await meetingsResponse.text());
       }
 
       // Load user tasks
-      const tasksResponse = await fetch('/api/user/tasks', { headers });
+      console.log('📋 Fetching user tasks...');
+      const tasksResponse = await fetch('http://localhost:8002/api/user/tasks', { headers });
+      console.log('📋 Tasks response status:', tasksResponse.status);
+      
       if (tasksResponse.ok) {
         const tasksData = await tasksResponse.json();
+        console.log('📋 Tasks data:', tasksData);
         setTasks(tasksData.tasks);
+      } else {
+        console.error('📋 Failed to fetch tasks:', await tasksResponse.text());
       }
 
     } catch (error) {
@@ -47,7 +61,7 @@ const UserDashboard = () => {
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/user/tasks/${taskId}`, {
+      const response = await fetch(`http://localhost:8002/api/user/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -163,15 +177,22 @@ const UserDashboard = () => {
                         <p className="text-muted small mb-2">{task.description}</p>
                         <div className="d-flex justify-content-between align-items-center mb-2">
                           <small className="text-muted">
-                            Due: {formatDate(task.due_date)}
+                            Due: {task.due_date ? formatDate(task.due_date) : 'No due date'}
                           </small>
                           <Badge bg={getStatusBadgeVariant(task.status)}>
                             {task.status}
                           </Badge>
                         </div>
                         <small className="text-muted d-block mb-2">
+                          <i className="fas fa-calendar-alt me-1"></i>
                           Meeting: {task.meeting_title}
                         </small>
+                        {task.meeting_date && (
+                          <small className="text-muted d-block mb-2">
+                            <i className="fas fa-clock me-1"></i>
+                            Meeting Date: {formatDate(task.meeting_date)}
+                          </small>
+                        )}
                         
                         {task.status !== 'completed' && (
                           <div className="btn-group btn-group-sm w-100">

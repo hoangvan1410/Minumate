@@ -104,38 +104,68 @@ sent_emails = {}
 @app.post("/api/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     """Register a new user."""
-    # Check if username or email already exists
-    existing_user = user_db.get_user_by_username(user_data.username)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
     
-    existing_email = user_db.get_user_by_email(user_data.email)
+    # Check if email exists and handle different statuses
+    existing_email = user_db.get_user_by_email_any_status(user_data.email)
     if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Hash password and create user
-    hashed_password = get_password_hash(user_data.password)
-    user_dict = {
-        "username": user_data.username,
-        "email": user_data.email,
-        "password": hashed_password,
-        "full_name": user_data.full_name,
-        "role": user_data.role,
-        "is_active": True
-    }
-    
-    user_id = user_db.create_user(user_dict)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user"
-        )
+        if existing_email['status'] == 'created':
+            # User was created from email sending, now they can complete registration
+            
+            # Check if the desired username is already taken by a registered user
+            existing_username = user_db.get_user_by_username_any_status(user_data.username)
+            if existing_username and existing_username['id'] != existing_email['id']:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already taken by another user"
+                )
+            
+            # Update user from "created" to "registered" status
+            hashed_password = get_password_hash(user_data.password)
+            updated = user_db.update_user_status_to_registered(
+                user_data.email, 
+                hashed_password, 
+                user_data.username,
+                user_data.full_name
+            )
+            if not updated:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to complete registration"
+                )
+            user_id = existing_email['id']
+        else:
+            # User already fully registered
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered and activated"
+            )
+    else:
+        # Check if username already exists for new user
+        existing_user = user_db.get_user_by_username_any_status(user_data.username)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
+            )
+        
+        # Create completely new user
+        hashed_password = get_password_hash(user_data.password)
+        user_dict = {
+            "username": user_data.username,
+            "email": user_data.email,
+            "password": hashed_password,
+            "full_name": user_data.full_name,
+            "role": user_data.role,
+            "status": "registered",
+            "is_active": True
+        }
+        
+        user_id = user_db.create_user(user_dict)
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create user"
+            )
     
     # Create access token
     access_token_expires = timedelta(minutes=30)
@@ -161,9 +191,40 @@ async def register(user_data: UserRegister):
 @app.post("/api/auth/login", response_model=Token)
 async def login(user_data: UserLogin):
     """Authenticate user and return JWT token."""
-    user = user_db.get_user_by_username(user_data.username)
+    user = user_db.get_user_by_username_any_status(user_data.username)
     
-    if not user or not verify_password(user_data.password, user["password_hash"]):
+    if not user:
+        # Check if user exists with same email but different username
+        user_by_email = user_db.get_user_by_email_any_status(user_data.username)  # In case they enter email as username
+        if user_by_email and user_by_email["status"] == "created":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account exists but not activated. Please complete registration first.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if user is fully registered BEFORE verifying password
+    if user["status"] != "registered":
+        if user["status"] == "created":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account not activated. Please complete registration first.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account not fully activated. Please contact support.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    
+    # Only verify password for registered users (who have valid password hashes)
+    if not user["password_hash"] or not verify_password(user_data.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -397,8 +458,109 @@ async def analyze_meeting_ajax(
         
         print("📧 Generated emails for participants:", list(personalized_emails.keys()))
         
-        # Prepare participant data for frontend
+        # Save meeting to database
+        meeting_id = user_db.create_meeting({
+            'title': meeting_data.title or 'Meeting Analysis',
+            'description': f"Meeting from {meeting_data.date}",
+            'transcript': transcript,
+            'analysis_result': json.dumps({
+                "executive_summary": meeting_summary.executive_summary,
+                "key_decisions": meeting_summary.key_decisions,
+                "action_items": [
+                    {
+                        "task": item.task,
+                        "owner": item.owner,
+                        "due_date": item.due_date,
+                        "priority": item.priority,
+                        "status": item.status
+                    } for item in meeting_summary.action_items
+                ],
+                "next_steps": meeting_summary.next_steps,
+                "risks_concerns": meeting_summary.risks_concerns
+            })
+        }, current_user["user_id"])
+        
+        # Create participants and associate them with the meeting
         participants_data = getattr(meeting_data, 'participants_data', [])
+        if not participants_data:
+            print("⚠️ No participant data found - using meeting_data.participants")
+            participants_data = [
+                {"name": name, "role": "Participant", "email_preference": "team"}
+                for name in (meeting_data.participants or [])
+            ]
+        
+        # Process participants and create user associations
+        participant_user_map = {}  # Map participant names to user IDs
+        
+        for participant in participants_data:
+            participant_name = participant['name']
+            user_id = None
+            
+            if 'email' in participant and participant['email']:
+                # Create user with email if provided
+                user_id = user_db.create_user_from_email(
+                    participant['email'], 
+                    participant_name
+                )
+            else:
+                # Create placeholder user without email for now
+                # Check if user already exists by name
+                existing_users = user_db.get_all_users()
+                for user in existing_users:
+                    if user['full_name'].lower() == participant_name.lower():
+                        user_id = user['id']
+                        break
+                
+                # If no existing user found, create a placeholder
+                if not user_id:
+                    placeholder_email = f"{participant_name.lower().replace(' ', '.')}@placeholder.com"
+                    user_id = user_db.create_user_from_email(placeholder_email, participant_name)
+                    print(f"📝 Created placeholder user for {participant_name} with email {placeholder_email}")
+            
+            if user_id and meeting_id:
+                # Add participant to meeting
+                user_db.add_meeting_participant(meeting_id, user_id, participant.get('role', 'participant'))
+                participant_user_map[participant_name] = user_id
+                print(f"👥 Added {participant_name} (ID: {user_id}) as participant to meeting {meeting_id}")
+        
+        # Create tasks from action items
+        if meeting_id:
+            for item in meeting_summary.action_items:
+                # Find user by name if owner is specified
+                assigned_to = None
+                if item.owner:
+                    # First try exact name match from participant_user_map
+                    for participant_name, user_id in participant_user_map.items():
+                        if participant_name.lower() == item.owner.lower():
+                            assigned_to = user_id
+                            print(f"📋 Assigning task '{item.task}' to {participant_name} (ID: {user_id})")
+                            break
+                    
+                    # If no exact match, try partial name match
+                    if not assigned_to:
+                        for participant_name, user_id in participant_user_map.items():
+                            name_parts = participant_name.lower().split()
+                            owner_parts = item.owner.lower().split()
+                            if any(part in name_parts for part in owner_parts):
+                                assigned_to = user_id
+                                print(f"📋 Assigning task '{item.task}' to {participant_name} (ID: {user_id}) via partial match")
+                                break
+                
+                task_id = user_db.create_task({
+                    'meeting_id': meeting_id,
+                    'assigned_to': assigned_to,
+                    'title': item.task,
+                    'description': f"Priority: {item.priority}",
+                    'due_date': item.due_date,
+                    'status': 'pending'
+                })
+                
+                if assigned_to:
+                    print(f"✅ Created task {task_id}: '{item.task}' assigned to user {assigned_to}")
+                else:
+                    print(f"⚠️ Created unassigned task {task_id}: '{item.task}' (owner: {item.owner})")
+        
+        # Prepare participant data for frontend
         if not participants_data:
             print("⚠️ No participant data found - using meeting_data.participants")
             participants_data = [
@@ -446,9 +608,11 @@ async def send_email(
     recipient_name: str = Form(...),
     email_subject: str = Form(...),
     email_content: str = Form(...),
-    tracking_enabled: bool = Form(default=True)
+    tracking_enabled: bool = Form(default=True),
+    meeting_id: Optional[int] = Form(default=None),
+    task_ids: Optional[str] = Form(default=None)  # Comma-separated task IDs
 ):
-    """Send personalized email via SendGrid with tracking."""
+    """Send personalized email via SendGrid with tracking and link to tasks."""
    
     # Check if SendGrid is available
     if sg is None:
@@ -532,6 +696,86 @@ async def send_email(
        
         # Save to database
         db.save_email(email_data)
+        
+        # Create user with 'created' status if they don't exist, or update placeholder user
+        user_id = None
+        
+        # First, check if there's a placeholder user with this name
+        existing_users = user_db.get_all_users()
+        placeholder_user = None
+        for user in existing_users:
+            if (user['full_name'].lower() == recipient_name.lower() and 
+                user['email'].endswith('@placeholder.com')):
+                placeholder_user = user
+                break
+        
+        if placeholder_user:
+            # Update placeholder user with real email
+            print(f"🔄 Updating placeholder user {placeholder_user['full_name']} with real email {recipient_email}")
+            user_db.update_user_email(placeholder_user['id'], recipient_email)
+            user_id = placeholder_user['id']
+        else:
+            # Create new user or get existing one
+            user_id = user_db.create_user_from_email(recipient_email, recipient_name)
+        
+        # Link user to meeting and tasks if provided
+        if user_id and meeting_id:
+            # Add user as participant to the meeting if not already added
+            user_db.add_meeting_participant(meeting_id, user_id, 'participant')
+            
+            # Parse and assign specific tasks if task_ids provided
+            if task_ids:
+                try:
+                    task_id_list = [int(tid.strip()) for tid in task_ids.split(',') if tid.strip()]
+                    for task_id in task_id_list:
+                        # Update task assignment to this user
+                        user_db.assign_task_to_user(task_id, user_id)
+                except (ValueError, TypeError) as e:
+                    print(f"Error parsing task IDs: {e}")
+            else:
+                # If no specific tasks provided, assign all unassigned tasks for this meeting 
+                # that mention this user in the task description/title or were assigned to this user by name
+                meeting_tasks = user_db.get_meeting_tasks(meeting_id)
+                for task in meeting_tasks:
+                    if not task.get('assigned_to'):
+                        # Check if task should be assigned to this user based on name matching
+                        task_title = task.get('title', '').lower()
+                        task_desc = task.get('description', '').lower()
+                        user_name = recipient_name.lower()
+                        
+                        # Simple name matching - check if user's first or last name appears
+                        name_parts = user_name.split()
+                        name_match = any(name_part in task_title or name_part in task_desc for name_part in name_parts)
+                        
+                        if name_match:
+                            print(f"📋 Assigning task '{task['title']}' to {recipient_name}")
+                            user_db.assign_task_to_user(task['id'], user_id)
+        elif user_id:
+            # Even without meeting_id, try to find recent meetings and assign relevant tasks
+            print(f"📋 Looking for recent tasks to assign to {recipient_name}")
+            
+            # Get user's recent meetings to find applicable tasks
+            user_meetings = user_db.get_user_meetings(user_id)
+            for meeting in user_meetings:
+                meeting_tasks = user_db.get_meeting_tasks(meeting['id'])
+                for task in meeting_tasks:
+                    if not task.get('assigned_to'):
+                        task_title = task.get('title', '').lower()
+                        task_desc = task.get('description', '').lower()
+                        user_name = recipient_name.lower()
+                        name_parts = user_name.split()
+                        name_match = any(name_part in task_title or name_part in task_desc for name_part in name_parts)
+                        
+                        if name_match:
+                            print(f"📋 Assigning task '{task['title']}' to {recipient_name} from meeting {meeting['title']}")
+                            user_db.assign_task_to_user(task['id'], user_id)
+        
+        # Store additional metadata for tracking
+        email_data.update({
+            'meeting_id': meeting_id,
+            'task_ids': task_ids,
+            'user_id': user_id
+        })
        
         # Keep in memory for backward compatibility
         sent_emails[tracking_id] = {
@@ -748,8 +992,8 @@ async def get_user_meetings(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/user/tasks")
 async def get_user_tasks(current_user: dict = Depends(get_current_user)):
-    """Get tasks assigned to the current user."""
-    tasks = user_db.get_user_tasks(current_user["user_id"])
+    """Get tasks assigned to the current user with meeting information."""
+    tasks = user_db.get_user_assigned_tasks(current_user["user_id"])
     return {"tasks": tasks}
 
 @app.put("/api/user/tasks/{task_id}")
@@ -801,8 +1045,84 @@ async def get_all_users(current_user: dict = Depends(get_admin_user)):
 @app.get("/api/admin/meetings")
 async def get_all_meetings(current_user: dict = Depends(get_admin_user)):
     """Get all meetings (Admin only)."""
-    # You'll need to implement this in user_db
-    return {"meetings": []}
+    meetings = user_db.get_all_meetings()
+    return {"meetings": meetings}
+
+@app.get("/api/admin/meetings/{meeting_id}")
+async def get_meeting_details(meeting_id: int, current_user: dict = Depends(get_admin_user)):
+    """Get meeting details with participants (Admin only)."""
+    meeting = user_db.get_meeting_by_id(meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"meeting": meeting}
+
+@app.put("/api/admin/meetings/{meeting_id}")
+async def update_meeting(
+    meeting_id: int,
+    meeting_data: dict,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Update meeting (Admin only)."""
+    success = user_db.update_meeting(meeting_id, meeting_data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Meeting not found or update failed")
+    return {"message": "Meeting updated successfully"}
+
+@app.delete("/api/admin/meetings/{meeting_id}")
+async def delete_meeting(meeting_id: int, current_user: dict = Depends(get_admin_user)):
+    """Delete meeting (Admin only)."""
+    success = user_db.delete_meeting(meeting_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Meeting not found or delete failed")
+    return {"message": "Meeting deleted successfully"}
+
+@app.put("/api/admin/users/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: dict,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Update user (Admin only)."""
+    success = user_db.update_user(user_id, user_data)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found or update failed")
+    return {"message": "User updated successfully"}
+
+@app.delete("/api/admin/users/{user_id}")
+async def delete_user(user_id: int, current_user: dict = Depends(get_admin_user)):
+    """Delete user (Admin only)."""
+    success = user_db.delete_user(user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found or delete failed")
+    return {"message": "User deleted successfully"}
+
+@app.post("/api/admin/meetings/{meeting_id}/participants")
+async def add_meeting_participant(
+    meeting_id: int,
+    participant_data: dict,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Add participant to meeting (Admin only)."""
+    success = user_db.add_meeting_participant(
+        meeting_id, 
+        participant_data.get("user_id"), 
+        participant_data.get("role", "participant")
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to add participant")
+    return {"message": "Participant added successfully"}
+
+@app.delete("/api/admin/meetings/{meeting_id}/participants/{user_id}")
+async def remove_meeting_participant(
+    meeting_id: int,
+    user_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Remove participant from meeting (Admin only)."""
+    success = user_db.remove_meeting_participant(meeting_id, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Participant not found or remove failed")
+    return {"message": "Participant removed successfully"}
 
 @app.post("/api/admin/meetings")
 async def create_meeting(

@@ -99,13 +99,34 @@ const EmailGeneration = ({ results }) => {
  
     setIsSending(true);
     try {
-      const response = await sendEmail({
+      // Prepare email data with meeting context
+      const emailPayload = {
         recipient_email: emailData.recipient_email,
         recipient_name: emailData.recipient_name,
         email_subject: emailData.subject,
         email_content: emailData.content,
         tracking_enabled: trackingEnabled
-      });
+      };
+
+      // Add meeting ID if available
+      if (results.meeting_id) {
+        emailPayload.meeting_id = results.meeting_id;
+      }
+
+      // Find relevant tasks for this participant
+      if (results.meeting_summary && results.meeting_summary.action_items) {
+        const participantTasks = results.meeting_summary.action_items
+          .filter(item => item.owner && item.owner.toLowerCase().includes(emailData.recipient_name.toLowerCase()))
+          .map(item => item.task);
+        
+        if (participantTasks.length > 0) {
+          // Note: We'll need to get actual task IDs from the backend
+          // For now, we'll let the backend handle task assignment based on name matching
+          emailPayload.participant_tasks = participantTasks.join(', ');
+        }
+      }
+
+      const response = await sendEmail(emailPayload);
  
       if (response.success) {
         toast.success(response.message);

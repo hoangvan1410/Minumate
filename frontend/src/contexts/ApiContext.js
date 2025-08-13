@@ -114,6 +114,130 @@ export const ApiProvider = ({ children }) => {
       throw new Error(error.response?.data?.error || 'Failed to cleanup emails');
     }
   };
+
+  // User Management APIs
+  const getAllUsers = async () => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/users`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting users:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get users');
+    }
+  };
+
+  const updateUser = async (userId, userData) => {
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders() 
+      };
+      const response = await axios.put(`${API_BASE_URL}/api/admin/users/${userId}`, userData, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to update user');
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.delete(`${API_BASE_URL}/api/admin/users/${userId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to delete user');
+    }
+  };
+
+  // Meeting Management APIs
+  const getAllMeetings = async () => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/meetings`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting meetings:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get meetings');
+    }
+  };
+
+  const getMeetingDetails = async (meetingId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/meetings/${meetingId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting meeting details:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get meeting details');
+    }
+  };
+
+  const createMeeting = async (meetingData) => {
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders() 
+      };
+      const response = await axios.post(`${API_BASE_URL}/api/admin/meetings`, meetingData, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating meeting:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to create meeting');
+    }
+  };
+
+  const updateMeeting = async (meetingId, meetingData) => {
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders() 
+      };
+      const response = await axios.put(`${API_BASE_URL}/api/admin/meetings/${meetingId}`, meetingData, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating meeting:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to update meeting');
+    }
+  };
+
+  const deleteMeeting = async (meetingId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.delete(`${API_BASE_URL}/api/admin/meetings/${meetingId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting meeting:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to delete meeting');
+    }
+  };
+
+  const addMeetingParticipant = async (meetingId, participantData) => {
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders() 
+      };
+      const response = await axios.post(`${API_BASE_URL}/api/admin/meetings/${meetingId}/participants`, participantData, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding participant:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to add participant');
+    }
+  };
+
+  const removeMeetingParticipant = async (meetingId, userId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.delete(`${API_BASE_URL}/api/admin/meetings/${meetingId}/participants/${userId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error removing participant:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to remove participant');
+    }
+  };
  
   const value = {
     analyzeTranscript,
@@ -123,6 +247,18 @@ export const ApiProvider = ({ children }) => {
     getEmailsAdmin,
     getEmailDetails,
     cleanupEmails,
+    // User Management
+    getAllUsers,
+    updateUser,
+    deleteUser,
+    // Meeting Management
+    getAllMeetings,
+    getMeetingDetails,
+    createMeeting,
+    updateMeeting,
+    deleteMeeting,
+    addMeetingParticipant,
+    removeMeetingParticipant,
     API_BASE_URL
   };
  
