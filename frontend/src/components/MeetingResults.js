@@ -42,7 +42,7 @@ const MeetingResults = ({ results }) => {
         </Card>
 
         {/* Executive Summary */}
-        {results.summary && (
+        {results.meeting_summary && results.meeting_summary.executive_summary && (
           <Card className="main-card mb-4">
             <Card.Header className="bg-white py-3">
               <h5 className="mb-0">
@@ -51,24 +51,24 @@ const MeetingResults = ({ results }) => {
               </h5>
             </Card.Header>
             <Card.Body>
-              <p>{results.summary}</p>
+              <p>{results.meeting_summary.executive_summary}</p>
             </Card.Body>
           </Card>
         )}
 
-        {/* Key Points */}
-        {results.key_points && results.key_points.length > 0 && (
+        {/* Key Decisions */}
+        {results.meeting_summary && results.meeting_summary.key_decisions && results.meeting_summary.key_decisions.length > 0 && (
           <Card className="main-card mb-4">
             <Card.Header className="bg-white py-3">
               <h5 className="mb-0">
                 <i className="fas fa-check-circle me-2 text-success"></i>
-                Key Points
+                Key Decisions
               </h5>
             </Card.Header>
             <Card.Body>
               <ul>
-                {results.key_points.map((point, index) => (
-                  <li key={index}>{point}</li>
+                {results.meeting_summary.key_decisions.map((decision, index) => (
+                  <li key={index}>{decision}</li>
                 ))}
               </ul>
             </Card.Body>
@@ -76,7 +76,7 @@ const MeetingResults = ({ results }) => {
         )}
 
         {/* Action Items */}
-        {results.action_items && results.action_items.length > 0 && (
+        {results.meeting_summary && results.meeting_summary.action_items && results.meeting_summary.action_items.length > 0 && (
           <Card className="main-card mb-4">
             <Card.Header className="bg-white py-3">
               <h5 className="mb-0">
@@ -86,7 +86,7 @@ const MeetingResults = ({ results }) => {
             </Card.Header>
             <Card.Body>
               <div className="row">
-                {results.action_items.map((item, index) => (
+                {results.meeting_summary.action_items.map((item, index) => (
                   <div key={index} className="col-md-6 mb-3">
                     <div className="border rounded p-3">
                       <h6>{item.task}</h6>
@@ -119,7 +119,7 @@ const MeetingResults = ({ results }) => {
         )}
 
         {/* Next Steps */}
-        {results.next_steps && results.next_steps.length > 0 && (
+        {results.meeting_summary && results.meeting_summary.next_steps && results.meeting_summary.next_steps.length > 0 && (
           <Card className="main-card mb-4">
             <Card.Header className="bg-white py-3">
               <h5 className="mb-0">
@@ -129,8 +129,27 @@ const MeetingResults = ({ results }) => {
             </Card.Header>
             <Card.Body>
               <ul>
-                {results.next_steps.map((step, index) => (
+                {results.meeting_summary.next_steps.map((step, index) => (
                   <li key={index}>{step}</li>
+                ))}
+              </ul>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Risks & Concerns */}
+        {results.meeting_summary && results.meeting_summary.risks_concerns && results.meeting_summary.risks_concerns.length > 0 && (
+          <Card className="main-card mb-4">
+            <Card.Header className="bg-white py-3">
+              <h5 className="mb-0">
+                <i className="fas fa-exclamation-triangle me-2 text-danger"></i>
+                Risks & Concerns
+              </h5>
+            </Card.Header>
+            <Card.Body>
+              <ul>
+                {results.meeting_summary.risks_concerns.map((risk, index) => (
+                  <li key={index}>{risk}</li>
                 ))}
               </ul>
             </Card.Body>

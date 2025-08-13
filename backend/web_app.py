@@ -480,7 +480,22 @@ async def analyze_meeting_ajax(
             })
         }, current_user["user_id"])
         
-        # Create participants and associate them with the meeting
+        # Create tasks from action items but DON'T assign to users yet
+        # This will be done later when sending emails
+        if meeting_id:
+            for item in meeting_summary.action_items:
+                task_id = user_db.create_task({
+                    'meeting_id': meeting_id,
+                    'assigned_to': None,  # No assignment during analysis
+                    'title': item.task,
+                    'description': f"Priority: {item.priority}, Owner: {item.owner or 'Unassigned'}",
+                    'due_date': item.due_date,
+                    'status': 'pending',
+                    'intended_owner': item.owner  # Store intended owner for later assignment
+                })
+                print(f"📝 Created unassigned task {task_id}: '{item.task}' (intended for: {item.owner or 'Unassigned'})")
+        
+        # Prepare participant data for frontend (no user creation here)
         participants_data = getattr(meeting_data, 'participants_data', [])
         if not participants_data:
             print("⚠️ No participant data found - using meeting_data.participants")
@@ -488,89 +503,11 @@ async def analyze_meeting_ajax(
                 {"name": name, "role": "Participant", "email_preference": "team"}
                 for name in (meeting_data.participants or [])
             ]
-        
-        # Process participants and create user associations
-        participant_user_map = {}  # Map participant names to user IDs
-        
-        for participant in participants_data:
-            participant_name = participant['name']
-            user_id = None
-            
-            if 'email' in participant and participant['email']:
-                # Create user with email if provided
-                user_id = user_db.create_user_from_email(
-                    participant['email'], 
-                    participant_name
-                )
-            else:
-                # Create placeholder user without email for now
-                # Check if user already exists by name
-                existing_users = user_db.get_all_users()
-                for user in existing_users:
-                    if user['full_name'].lower() == participant_name.lower():
-                        user_id = user['id']
-                        break
-                
-                # If no existing user found, create a placeholder
-                if not user_id:
-                    placeholder_email = f"{participant_name.lower().replace(' ', '.')}@placeholder.com"
-                    user_id = user_db.create_user_from_email(placeholder_email, participant_name)
-                    print(f"📝 Created placeholder user for {participant_name} with email {placeholder_email}")
-            
-            if user_id and meeting_id:
-                # Add participant to meeting
-                user_db.add_meeting_participant(meeting_id, user_id, participant.get('role', 'participant'))
-                participant_user_map[participant_name] = user_id
-                print(f"👥 Added {participant_name} (ID: {user_id}) as participant to meeting {meeting_id}")
-        
-        # Create tasks from action items
-        if meeting_id:
-            for item in meeting_summary.action_items:
-                # Find user by name if owner is specified
-                assigned_to = None
-                if item.owner:
-                    # First try exact name match from participant_user_map
-                    for participant_name, user_id in participant_user_map.items():
-                        if participant_name.lower() == item.owner.lower():
-                            assigned_to = user_id
-                            print(f"📋 Assigning task '{item.task}' to {participant_name} (ID: {user_id})")
-                            break
-                    
-                    # If no exact match, try partial name match
-                    if not assigned_to:
-                        for participant_name, user_id in participant_user_map.items():
-                            name_parts = participant_name.lower().split()
-                            owner_parts = item.owner.lower().split()
-                            if any(part in name_parts for part in owner_parts):
-                                assigned_to = user_id
-                                print(f"📋 Assigning task '{item.task}' to {participant_name} (ID: {user_id}) via partial match")
-                                break
-                
-                task_id = user_db.create_task({
-                    'meeting_id': meeting_id,
-                    'assigned_to': assigned_to,
-                    'title': item.task,
-                    'description': f"Priority: {item.priority}",
-                    'due_date': item.due_date,
-                    'status': 'pending'
-                })
-                
-                if assigned_to:
-                    print(f"✅ Created task {task_id}: '{item.task}' assigned to user {assigned_to}")
-                else:
-                    print(f"⚠️ Created unassigned task {task_id}: '{item.task}' (owner: {item.owner})")
-        
-        # Prepare participant data for frontend
-        if not participants_data:
-            print("⚠️ No participant data found - using meeting_data.participants")
-            participants_data = [
-                {"name": name, "role": "Participant", "email_preference": "team"}
-                for name in (meeting_data.participants or [])
-            ]
        
-        # Return JSON response
+        # Return JSON response with meetingId
         return JSONResponse(content={
             "success": True,
+            "meeting_id": meeting_id,  # Include meeting_id in response
             "meeting_data": {
                 "title": meeting_data.title,
                 "date": meeting_data.date,
@@ -697,78 +634,40 @@ async def send_email(
         # Save to database
         db.save_email(email_data)
         
-        # Create user with 'created' status if they don't exist, or update placeholder user
-        user_id = None
+        # Create user with 'created' status if they don't exist
+        user_id = user_db.create_user_from_email(recipient_email, recipient_name)
+        print(f"� User created/found: {recipient_name} (ID: {user_id})")
         
-        # First, check if there's a placeholder user with this name
-        existing_users = user_db.get_all_users()
-        placeholder_user = None
-        for user in existing_users:
-            if (user['full_name'].lower() == recipient_name.lower() and 
-                user['email'].endswith('@placeholder.com')):
-                placeholder_user = user
-                break
-        
-        if placeholder_user:
-            # Update placeholder user with real email
-            print(f"🔄 Updating placeholder user {placeholder_user['full_name']} with real email {recipient_email}")
-            user_db.update_user_email(placeholder_user['id'], recipient_email)
-            user_id = placeholder_user['id']
-        else:
-            # Create new user or get existing one
-            user_id = user_db.create_user_from_email(recipient_email, recipient_name)
-        
-        # Link user to meeting and tasks if provided
+        # Link user to meeting and tasks (simplified flow)
         if user_id and meeting_id:
-            # Add user as participant to the meeting if not already added
+            # Add user as participant to the meeting
             user_db.add_meeting_participant(meeting_id, user_id, 'participant')
+            print(f"👥 Added user {user_id} as participant to meeting {meeting_id}")
             
-            # Parse and assign specific tasks if task_ids provided
-            if task_ids:
-                try:
-                    task_id_list = [int(tid.strip()) for tid in task_ids.split(',') if tid.strip()]
-                    for task_id in task_id_list:
-                        # Update task assignment to this user
-                        user_db.assign_task_to_user(task_id, user_id)
-                except (ValueError, TypeError) as e:
-                    print(f"Error parsing task IDs: {e}")
+            # Find and assign tasks intended for this user in this specific meeting
+            unassigned_tasks = user_db.get_unassigned_tasks_by_intended_owner(meeting_id, recipient_name)
+            
+            # Also check for name variations (first name, last name) within the same meeting
+            name_parts = recipient_name.lower().split()
+            for name_part in name_parts:
+                if len(name_part) > 2:  # Only check meaningful name parts
+                    additional_tasks = user_db.get_unassigned_tasks_by_intended_owner(meeting_id, name_part)
+                    # Add tasks that aren't already in the list
+                    for task in additional_tasks:
+                        if not any(t['id'] == task['id'] for t in unassigned_tasks):
+                            unassigned_tasks.append(task)
+            
+            # Assign found tasks to the user
+            for task in unassigned_tasks:
+                user_db.assign_task_to_user(task['id'], user_id)
+                print(f"📋 Assigned task '{task['title']}' (ID: {task['id']}) to {recipient_name} based on intended owner: {task['intended_owner']}")
+            
+            if unassigned_tasks:
+                print(f"✅ Successfully assigned {len(unassigned_tasks)} tasks to {recipient_name}")
             else:
-                # If no specific tasks provided, assign all unassigned tasks for this meeting 
-                # that mention this user in the task description/title or were assigned to this user by name
-                meeting_tasks = user_db.get_meeting_tasks(meeting_id)
-                for task in meeting_tasks:
-                    if not task.get('assigned_to'):
-                        # Check if task should be assigned to this user based on name matching
-                        task_title = task.get('title', '').lower()
-                        task_desc = task.get('description', '').lower()
-                        user_name = recipient_name.lower()
-                        
-                        # Simple name matching - check if user's first or last name appears
-                        name_parts = user_name.split()
-                        name_match = any(name_part in task_title or name_part in task_desc for name_part in name_parts)
-                        
-                        if name_match:
-                            print(f"📋 Assigning task '{task['title']}' to {recipient_name}")
-                            user_db.assign_task_to_user(task['id'], user_id)
+                print(f"ℹ️ No matching unassigned tasks found for {recipient_name} in meeting {meeting_id}")
         elif user_id:
-            # Even without meeting_id, try to find recent meetings and assign relevant tasks
-            print(f"📋 Looking for recent tasks to assign to {recipient_name}")
-            
-            # Get user's recent meetings to find applicable tasks
-            user_meetings = user_db.get_user_meetings(user_id)
-            for meeting in user_meetings:
-                meeting_tasks = user_db.get_meeting_tasks(meeting['id'])
-                for task in meeting_tasks:
-                    if not task.get('assigned_to'):
-                        task_title = task.get('title', '').lower()
-                        task_desc = task.get('description', '').lower()
-                        user_name = recipient_name.lower()
-                        name_parts = user_name.split()
-                        name_match = any(name_part in task_title or name_part in task_desc for name_part in name_parts)
-                        
-                        if name_match:
-                            print(f"📋 Assigning task '{task['title']}' to {recipient_name} from meeting {meeting['title']}")
-                            user_db.assign_task_to_user(task['id'], user_id)
+            print(f"⚠️ No meeting_id provided. User {recipient_name} created but no tasks assigned.")
         
         # Store additional metadata for tracking
         email_data.update({

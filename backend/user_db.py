@@ -80,12 +80,19 @@ class UserDB:
                 description TEXT,
                 due_date TIMESTAMP,
                 status TEXT DEFAULT 'pending',  -- 'pending', 'in_progress', 'completed'
+                intended_owner TEXT,  -- Store intended owner name for later assignment
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (meeting_id) REFERENCES meetings (id),
                 FOREIGN KEY (assigned_to) REFERENCES users (id)
             )
         ''')
+        
+        # Add intended_owner column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute('ALTER TABLE tasks ADD COLUMN intended_owner TEXT')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         # Create indexes
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)')
@@ -228,7 +235,7 @@ class UserDB:
             cursor = conn.cursor()
 
             cursor.execute('''
-                SELECT id, username, email, full_name, role, is_active, created_at
+                SELECT id, username, email, full_name, role, status, is_active, created_at
                 FROM users WHERE is_active = 1
                 ORDER BY created_at DESC
             ''')
@@ -242,8 +249,9 @@ class UserDB:
                 'email': row[2],
                 'full_name': row[3],
                 'role': row[4],
-                'is_active': row[5],
-                'created_at': row[6]
+                'status': row[5],
+                'is_active': row[6],
+                'created_at': row[7]
             } for row in rows]
         except Exception as e:
             print(f"Error getting all users: {e}")
@@ -472,15 +480,16 @@ class UserDB:
             cursor = conn.cursor()
 
             cursor.execute('''
-                INSERT INTO tasks (meeting_id, assigned_to, title, description, due_date, status)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO tasks (meeting_id, assigned_to, title, description, due_date, status, intended_owner)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 task_data['meeting_id'],
                 task_data.get('assigned_to'),
                 task_data['title'],
                 task_data.get('description', ''),
                 task_data.get('due_date'),
-                task_data.get('status', 'pending')
+                task_data.get('status', 'pending'),
+                task_data.get('intended_owner')
             ))
 
             task_id = cursor.lastrowid
@@ -776,6 +785,46 @@ class UserDB:
             } for row in rows]
         except Exception as e:
             print(f"Error getting meeting tasks: {e}")
+            return []
+
+    def get_unassigned_tasks_by_intended_owner(self, meeting_id: int, owner_name: str) -> List[Dict]:
+        """Get unassigned tasks that are intended for a specific owner."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Get all unassigned tasks for this meeting
+            cursor.execute('''
+                SELECT id, title, description, due_date, status, intended_owner
+                FROM tasks 
+                WHERE meeting_id = ? AND assigned_to IS NULL
+            ''', (meeting_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            # Filter tasks using proper name matching to avoid partial matches
+            matching_tasks = []
+            owner_name_lower = owner_name.lower().strip()
+            
+            for row in rows:
+                intended_owner = (row[5] or '').lower().strip()
+                
+                # Check for exact match or proper word boundary match
+                if (intended_owner == owner_name_lower or 
+                    owner_name_lower in intended_owner.split()):
+                    matching_tasks.append({
+                        'id': row[0],
+                        'title': row[1],
+                        'description': row[2],
+                        'due_date': row[3],
+                        'status': row[4],
+                        'intended_owner': row[5]
+                    })
+
+            return matching_tasks
+        except Exception as e:
+            print(f"Error getting unassigned tasks by intended owner: {e}")
             return []
 
     def get_user_assigned_tasks(self, user_id: int) -> List[Dict]:

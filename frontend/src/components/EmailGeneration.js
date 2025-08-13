@@ -22,9 +22,8 @@ const EmailGeneration = ({ results }) => {
     return null;
   }
 
-  // For new API format, we don't have personalized emails yet
-  // We could implement this feature later or use the old endpoint
-  if (results.meeting_id !== undefined) {
+  // Check if we have personalized emails (works with both old and new format)
+  if (!results.personalized_emails || !results.participants) {
     return (
       <Card className="main-card mb-4">
         <Card.Header className="bg-white py-3">
@@ -36,17 +35,14 @@ const EmailGeneration = ({ results }) => {
         <Card.Body>
           <Alert variant="info">
             <i className="fas fa-info-circle me-2"></i>
-            Email generation for the new meeting analysis format is coming soon. 
-            The meeting has been saved with ID: {results.meeting_id}
+            {results.meeting_id ? 
+              `Email generation ready! Meeting saved with ID: ${results.meeting_id}` :
+              'No email data available from the analysis.'
+            }
           </Alert>
         </Card.Body>
       </Card>
     );
-  }
-
-  // Handle old format for backward compatibility
-  if (!results.participants || !results.personalized_emails) {
-    return null;
   }
 
   const { personalized_emails, participants } = results;
