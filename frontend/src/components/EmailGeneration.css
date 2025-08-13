@@ -12,3 +12,63 @@
 .email-preview p {
     margin-bottom: 1em;
 }
+
+/* Bulk send functionality styles */
+.list-group-item {
+    border: 1px solid #dee2e6;
+    margin-bottom: 2px;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Participant selection area */
+.participant-selection {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Bulk send alert */
+.alert-info {
+    font-size: 0.9rem;
+}
+
+/* Edited email indicator */
+.text-warning {
+    color: #f39c12 !important;
+}
+
+.list-group-item .fas.fa-edit {
+    font-size: 0.8rem;
+}
+
+/* Button spacing */
+.btn + .btn {
+    margin-left: 0.25rem;
+}

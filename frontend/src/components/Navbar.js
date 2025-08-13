@@ -12,7 +12,23 @@ const Navbar = () => {
   };
 
   return (
-    <BSNavbar expand="lg" className="navbar-custom" variant="dark">
+    <BSNavbar 
+      expand="lg" 
+      className="navbar-custom" 
+      variant="dark"
+      fixed="top"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        width: '100%',
+        zIndex: 1050,
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
+      }}
+    >
       <Container>
         <BSNavbar.Brand as={Link} to="/">
           <i className="fas fa-brain me-2"></i>
@@ -24,16 +40,6 @@ const Navbar = () => {
         <BSNavbar.Collapse id="basic-navbar-nav">
           {isAuthenticated ? (
             <Nav className="ms-auto">
-              <Nav.Link
-                as={Link}
-                to="/dashboard"
-                active={location.pathname === '/dashboard'}
-                className="nav-item-spacing"
-              >
-                <i className="fas fa-home me-1"></i>
-                Dashboard
-              </Nav.Link>
-              
               {user?.role === 'admin' && (
                 <>
                   <Nav.Link

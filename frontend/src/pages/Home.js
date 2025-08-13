@@ -46,30 +46,7 @@ const Home = () => {
     }
   };  return (
     <div>
-      {/* Header */}
-      <div className="app-header">
-        <Container>
-          <div className="row align-items-center">
-            <div className="col-md-8">
-              <h1 className="mb-0">
-                <i className="fas fa-brain me-3"></i>
-                Meeting Analyzer
-              </h1>
-              <p className="mb-0 mt-2 opacity-75">
-                Convert your meeting transcripts into insights and emails
-              </p>
-            </div>
-            <div className="col-md-4 text-end">
-              <div className="text-white">
-                <i className="fas fa-check-circle me-2"></i>
-                Advanced AI Processing
-              </div>
-            </div>
-          </div>
-        </Container>
-      </div>
- 
-      <Container>
+      <Container className="mt-4">
         {/* Error Alert */}
         {error && (
           <Alert variant="danger" className="alert-custom" dismissible onClose={() => setError(null)}>

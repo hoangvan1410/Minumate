@@ -36,9 +36,14 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   return children;
 };
 
+// Helper function to get default route based on user role
+const getDefaultRoute = (user) => {
+  return user?.role === 'admin' ? '/' : '/dashboard';
+};
+
 // Main App Content
 const AppContent = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -58,7 +63,7 @@ const AppContent = () => {
         <Route 
           path="/auth" 
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <AuthPage />
+            isAuthenticated ? <Navigate to={getDefaultRoute(user)} replace /> : <AuthPage />
           } 
         />
         
@@ -95,7 +100,7 @@ const AppContent = () => {
         <Route
           path="*"
           element={
-            <Navigate to={isAuthenticated ? "/dashboard" : "/auth"} replace />
+            <Navigate to={isAuthenticated ? getDefaultRoute(user) : "/auth"} replace />
           }
         />
       </Routes>

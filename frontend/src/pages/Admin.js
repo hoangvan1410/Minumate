@@ -239,32 +239,8 @@ const Admin = () => {
   );
  
   return (
-    <div>
-      {/* Header */}
-      <div className="app-header">
-        <Container>
-          <div className="row align-items-center">
-            <div className="col-md-8">
-              <h1 className="mb-0">
-                <i className="fas fa-cogs me-3"></i>
-                Admin Dashboard
-              </h1>
-              <p className="mb-0 mt-2 opacity-75">
-                User, meeting, and email management
-              </p>
-            </div>
-            <div className="col-md-4 text-end">
-              <Button variant="light" onClick={handleCleanup}>
-                <i className="fas fa-trash me-2"></i>
-                Clean Emails
-              </Button>
-            </div>
-          </div>
-        </Container>
-      </div>
-
-      <Container>
-        <Tabs defaultActiveKey="compose" className="mb-4">
+    <Container className="mt-4">
+      <Tabs defaultActiveKey="compose" className="mb-4">
           <Tab eventKey="compose" title={<><i className="fas fa-edit me-2"></i>Compose Email</>}>
             <EmailComposer />
           </Tab>
@@ -727,8 +703,7 @@ const Admin = () => {
         >
           <i className={`fas fa-sync-alt ${(emailLoading || userLoading || meetingLoading) ? 'fa-spin' : ''}`}></i>
         </Button>
-      </Container>
- 
+
       {/* User Edit Modal */}
       <Modal show={showUserModal} onHide={() => setShowUserModal(false)} size="lg">
         <Modal.Header closeButton>
@@ -1011,7 +986,7 @@ const Admin = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+    </Container>
   );
 };
 
