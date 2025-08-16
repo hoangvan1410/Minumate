@@ -911,7 +911,7 @@ async def update_task_status(
     return {"message": "Task status updated successfully"}
 
 @app.get("/api/user/meetings/{meeting_id}")
-async def get_meeting_details(
+async def get_user_meeting_details(
     meeting_id: int,
     current_user: dict = Depends(get_current_user)
 ):
@@ -926,13 +926,30 @@ async def get_meeting_details(
             detail="You don't have access to this meeting"
         )
     
-    # Get meeting details (you'll need to add this method to user_db)
-    # For now, return basic info
-    meeting = next((m for m in user_meetings if m["id"] == meeting_id), None)
+    # Get detailed meeting information
+    meeting = user_db.get_meeting_by_id(meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     
-    return {"meeting": meeting}
+    # Get user tasks for this meeting
+    user_tasks = user_db.get_user_tasks(current_user["user_id"])
+    meeting_tasks = [task for task in user_tasks if task.get("meeting_id") == meeting_id]
+    
+    # Add tasks to meeting data
+    meeting["tasks"] = meeting_tasks
+    
+    # Add user role from the participants list
+    user_participant = next((p for p in meeting['participants'] if p['id'] == current_user["user_id"]), None)
+    if user_participant:
+        meeting['user_role'] = user_participant['role']
+    else:
+        # If not found in participants, check if user is the creator
+        if meeting.get('created_by') == current_user["user_id"]:
+            meeting['user_role'] = 'organizer'
+        else:
+            meeting['user_role'] = 'participant'
+    
+    return meeting
 
 # Admin endpoints
 @app.get("/api/admin/users")
@@ -948,7 +965,7 @@ async def get_all_meetings(current_user: dict = Depends(get_admin_user)):
     return {"meetings": meetings}
 
 @app.get("/api/admin/meetings/{meeting_id}")
-async def get_meeting_details(meeting_id: int, current_user: dict = Depends(get_admin_user)):
+async def get_admin_meeting_details(meeting_id: int, current_user: dict = Depends(get_admin_user)):
     """Get meeting details with participants (Admin only)."""
     meeting = user_db.get_meeting_by_id(meeting_id)
     if not meeting:

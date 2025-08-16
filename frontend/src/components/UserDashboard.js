@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal } from 'react-bootstrap';
 import { useAuth } from '../contexts/AuthContext';
 
 const UserDashboard = () => {
@@ -8,6 +8,9 @@ const UserDashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showMeetingDetailsModal, setShowMeetingDetailsModal] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [loadingMeetingDetails, setLoadingMeetingDetails] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -82,6 +85,38 @@ const UserDashboard = () => {
     }
   };
 
+  const handleViewMeetingDetails = async (meeting) => {
+    setLoadingMeetingDetails(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8002/api/user/meetings/${meeting.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const meetingDetails = await response.json();
+        console.log('📊 Meeting details received:', meetingDetails);
+        console.log('📈 Analysis data:', meetingDetails.analysis);
+        console.log('� Analysis structure:', JSON.stringify(meetingDetails.analysis, null, 2));
+        console.log('�📋 Tasks data:', meetingDetails.tasks);
+        console.log('📋 Tasks count:', meetingDetails.tasks?.length);
+        console.log('🔍 Full object keys:', Object.keys(meetingDetails));
+        setSelectedMeeting(meetingDetails);
+        setShowMeetingDetailsModal(true);
+      } else {
+        setError('Failed to load meeting details');
+      }
+    } catch (error) {
+      console.error('Error loading meeting details:', error);
+      setError('Failed to load meeting details');
+    } finally {
+      setLoadingMeetingDetails(false);
+    }
+  };
+
   const getStatusBadgeVariant = (status) => {
     switch (status) {
       case 'completed': return 'success';
@@ -138,6 +173,7 @@ const UserDashboard = () => {
                       <th>Role</th>
                       <th>Created By</th>
                       <th>Date</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -151,6 +187,17 @@ const UserDashboard = () => {
                         </td>
                         <td>{meeting.creator}</td>
                         <td>{formatDate(meeting.created_at)}</td>
+                        <td>
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => handleViewMeetingDetails(meeting)}
+                            disabled={loadingMeetingDetails}
+                          >
+                            <i className="fas fa-eye me-1"></i>
+                            View Details
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -223,6 +270,236 @@ const UserDashboard = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Meeting Details Modal */}
+      <Modal show={showMeetingDetailsModal} onHide={() => setShowMeetingDetailsModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="fas fa-calendar-alt me-2"></i>
+            Meeting Details: {selectedMeeting?.title}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedMeeting && (
+            <>
+              {console.log('🎯 Rendering modal with selectedMeeting:', selectedMeeting)}
+              {console.log('🎯 Analysis exists?', !!selectedMeeting.analysis)}
+              {console.log('🎯 Tasks exists?', !!selectedMeeting.tasks)}
+              <Row>
+              <Col md={12}>
+                <Card className="mb-4">
+                  <Card.Header>
+                    <h6><i className="fas fa-info-circle me-2"></i>Meeting Information</h6>
+                  </Card.Header>
+                  <Card.Body>
+                    <Row>
+                      <Col md={6}>
+                        <Table borderless>
+                          <tbody>
+                            <tr>
+                              <td><strong>Title:</strong></td>
+                              <td>{selectedMeeting.title}</td>
+                            </tr>
+                            <tr>
+                              <td><strong>Description:</strong></td>
+                              <td>{selectedMeeting.description || 'No description'}</td>
+                            </tr>
+                            <tr>
+                              <td><strong>Your Role:</strong></td>
+                              <td>
+                                <Badge bg={selectedMeeting.user_role === 'organizer' ? 'primary' : 'secondary'}>
+                                  {selectedMeeting.user_role}
+                                </Badge>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </Table>
+                      </Col>
+                      <Col md={6}>
+                        <Table borderless>
+                          <tbody>
+                            <tr>
+                              <td><strong>Created By:</strong></td>
+                              <td>{selectedMeeting.creator}</td>
+                            </tr>
+                            <tr>
+                              <td><strong>Created:</strong></td>
+                              <td>{formatDate(selectedMeeting.created_at)}</td>
+                            </tr>
+                            <tr>
+                              <td><strong>Total Tasks:</strong></td>
+                              <td><Badge bg="warning">{selectedMeeting.tasks?.length || 0}</Badge></td>
+                            </tr>
+                          </tbody>
+                        </Table>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+
+                {selectedMeeting.analysis && (
+                  <Card className="mb-4">
+                    <Card.Header>
+                      <h6><i className="fas fa-chart-pie me-2"></i>Meeting Analysis</h6>
+                    </Card.Header>
+                    <Card.Body>
+                      {selectedMeeting.analysis.executive_summary && (
+                        <Row className="mb-4">
+                          <Col md={12}>
+                            <h6><i className="fas fa-file-alt me-2"></i>Executive Summary</h6>
+                            <div className="bg-light p-3 rounded">
+                              <p className="mb-0">{selectedMeeting.analysis.executive_summary}</p>
+                            </div>
+                          </Col>
+                        </Row>
+                      )}
+
+                      <Row>
+                        <Col md={6}>
+                          <h6><i className="fas fa-tasks me-2"></i>Action Items</h6>
+                          {selectedMeeting.analysis.action_items?.length > 0 ? (
+                            <div className="list-group list-group-flush">
+                              {selectedMeeting.analysis.action_items.map((item, index) => (
+                                <div key={index} className="list-group-item border-0 px-0">
+                                  <div className="d-flex justify-content-between align-items-start">
+                                    <div>
+                                      <strong>{item.task}</strong>
+                                      {item.owner && (
+                                        <small className="d-block text-muted">
+                                          Assigned to: {item.owner}
+                                        </small>
+                                      )}
+                                      {item.due_date && (
+                                        <small className="d-block text-muted">
+                                          Due: {formatDate(item.due_date)}
+                                        </small>
+                                      )}
+                                    </div>
+                                    <Badge bg={
+                                      item.priority === 'high' ? 'danger' :
+                                      item.priority === 'medium' ? 'warning' : 'secondary'
+                                    }>
+                                      {item.priority || 'Normal'}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-muted">No action items identified</p>
+                          )}
+                        </Col>
+                        
+                        <Col md={6}>
+                          <h6><i className="fas fa-lightbulb me-2"></i>Key Decisions</h6>
+                          {selectedMeeting.analysis.key_decisions?.length > 0 ? (
+                            <div className="list-group list-group-flush">
+                              {selectedMeeting.analysis.key_decisions.map((decision, index) => (
+                                <div key={index} className="list-group-item border-0 px-0">
+                                  <i className="fas fa-circle text-success me-2" style={{fontSize: '0.5rem'}}></i>
+                                  {decision}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-muted">No key decisions identified</p>
+                          )}
+
+                          {selectedMeeting.analysis.next_steps?.length > 0 && (
+                            <>
+                              <h6 className="mt-4"><i className="fas fa-arrow-right me-2"></i>Next Steps</h6>
+                              <div className="list-group list-group-flush">
+                                {selectedMeeting.analysis.next_steps.map((step, index) => (
+                                  <div key={index} className="list-group-item border-0 px-0">
+                                    <i className="fas fa-circle text-primary me-2" style={{fontSize: '0.5rem'}}></i>
+                                    {step}
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                )}
+
+                {selectedMeeting.tasks?.length > 0 && (
+                  <Card>
+                    <Card.Header>
+                      <h6><i className="fas fa-tasks me-2"></i>Your Tasks from this Meeting</h6>
+                    </Card.Header>
+                    <Card.Body>
+                      <Table responsive hover>
+                        <thead>
+                          <tr>
+                            <th>Task</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedMeeting.tasks.map((task) => (
+                            <tr key={task.id}>
+                              <td>
+                                <strong>{task.title}</strong>
+                                {task.description && (
+                                  <small className="d-block text-muted">{task.description}</small>
+                                )}
+                              </td>
+                              <td>{formatDate(task.due_date)}</td>
+                              <td>
+                                <Badge bg={getStatusBadgeVariant(task.status)}>
+                                  {task.status}
+                                </Badge>
+                              </td>
+                              <td>
+                                {task.status !== 'completed' && (
+                                  <div className="btn-group btn-group-sm">
+                                    {task.status === 'pending' && (
+                                      <Button
+                                        variant="warning"
+                                        size="sm"
+                                        onClick={() => {
+                                          updateTaskStatus(task.id, 'in_progress');
+                                          setShowMeetingDetailsModal(false);
+                                        }}
+                                      >
+                                        Start
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      onClick={() => {
+                                        updateTaskStatus(task.id, 'completed');
+                                        setShowMeetingDetailsModal(false);
+                                      }}
+                                    >
+                                      Complete
+                                    </Button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </Card.Body>
+                  </Card>
+                )}
+              </Col>
+            </Row>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowMeetingDetailsModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

@@ -1,6 +1,7 @@
 """User management database operations."""
 
 import sqlite3
+import json
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -450,7 +451,7 @@ class UserDB:
 
             cursor.execute('''
                 SELECT t.id, t.title, t.description, t.due_date, t.status, 
-                       m.title as meeting_title, t.created_at
+                       m.title as meeting_title, t.created_at, t.meeting_id
                 FROM tasks t
                 JOIN meetings m ON t.meeting_id = m.id
                 WHERE t.assigned_to = ?
@@ -467,7 +468,8 @@ class UserDB:
                 'due_date': row[3],
                 'status': row[4],
                 'meeting_title': row[5],
-                'created_at': row[6]
+                'created_at': row[6],
+                'meeting_id': row[7]
             } for row in rows]
         except Exception as e:
             print(f"Error getting user tasks: {e}")
@@ -562,7 +564,7 @@ class UserDB:
 
             # Get meeting details
             cursor.execute('''
-                SELECT m.id, m.title, m.description, m.transcript, m.created_by, 
+                SELECT m.id, m.title, m.description, m.transcript, m.analysis_result, m.created_by, 
                        m.created_at, u.full_name as creator_name
                 FROM meetings m
                 LEFT JOIN users u ON m.created_by = u.id
@@ -585,14 +587,23 @@ class UserDB:
             participants = cursor.fetchall()
             conn.close()
 
+            # Parse analysis_result if it exists
+            analysis = None
+            if meeting_row[4]:  # analysis_result
+                try:
+                    analysis = json.loads(meeting_row[4])
+                except:
+                    analysis = None
+
             return {
                 'id': meeting_row[0],
                 'title': meeting_row[1],
                 'description': meeting_row[2],
                 'transcript': meeting_row[3],
-                'creator_id': meeting_row[4],
-                'created_at': meeting_row[5],
-                'creator_name': meeting_row[6],
+                'analysis': analysis,
+                'creator_id': meeting_row[5],
+                'created_at': meeting_row[6],
+                'creator_name': meeting_row[7],
                 'participants': [{
                     'id': p[0],
                     'full_name': p[1],
