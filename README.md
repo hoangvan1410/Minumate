@@ -1,43 +1,423 @@
-# AI-Powered Meeting Transcript Analyzer with Web Interface
- 
-## Overview
-This project is a production-ready AI-powered meeting transcript analyzer using OpenAI with advanced prompting techniques. The system analyzes meeting transcripts and generates professional stakeholder emails with a modern web interface for easy interaction.
- 
-## Features
- 
-### 1. Advanced AI Analysis
-- **Meeting Transcript Processing**: Analyzes meeting content and extracts structured information
-- **Action Item Extraction**: Identifies tasks, owners, deadlines, and priorities
-- **Key Decision Identification**: Captures important decisions and outcomes
+# Minumate - AI-Powered Meeting Management Platform
+
+## 🎯 Overview
+Minumate is a comprehensive meeting management platform that leverages AI to transform meeting transcripts into actionable insights. The system provides intelligent analysis, automated task generation, professional email creation, user authentication, project management, and comprehensive analytics in a modern web interface.
+
+## ✨ Core Features
+
+### 🤖 AI-Powered Meeting Analysis
+- **Advanced Transcript Processing**: Utilizes OpenAI GPT-4 for intelligent meeting analysis
+- **Executive Summary Generation**: Creates concise, leadership-focused meeting overviews
+- **Action Item Extraction**: Automatically identifies tasks with owners, deadlines, and priorities
+- **Key Decision Tracking**: Captures and structures important meeting decisions
 - **Risk Assessment**: Identifies concerns, blockers, and potential issues
-- **Executive Summary Generation**: Creates concise meeting overviews
- 
-### 2. Professional Email Generation
-- **Multi-Stakeholder Support**: Different email types for various audiences
-  - Executive Summary: High-level overview for leadership
-  - Team Detailed: Comprehensive information for team members
-  - Action Items: Task-focused communication
-  - External Stakeholder: Formal communication for external parties
-- **Context-Aware Content**: Tailored messaging based on recipient roles
-- **Professional Formatting**: Structured, business-appropriate email templates
- 
-### 3. Advanced Prompting Techniques
-- **Few-Shot Prompting**: Embedded examples for consistent analysis patterns
-- **Chain-of-Thought Reasoning**: Step-by-step explanation and analysis
-- **Context Management**: System prompts and conversation history preservation
-- **Role-Based Messaging**: Proper conversation structure with AI
- 
-### 4. Modern Web Interface
-- **Multiple Input Methods**: Support for text paste AND file upload (.txt files)
-- **Automatic Metadata Extraction**: AI extracts meeting details from transcript content
-- **Editable Email Content**: Modify generated emails before sending
-- **Direct Email Sending**: Integrated SendGrid for professional email delivery
-- **Email Tracking**: Optional delivery and read receipt tracking
-- **Real-Time Processing**: Live feedback during analysis
-- **Interactive Results**: Comprehensive display of analysis results
-- **Responsive Design**: Works on desktop, tablet, and mobile devices
-- **React Frontend**: Modern single-page application with real-time updates
-- **Admin Dashboard**: Advanced email tracking and analytics interface
+- **Next Steps Planning**: Generates clear follow-up actions and responsibilities
+
+### 👥 User Management & Authentication
+- **JWT-Based Authentication**: Secure login system with role-based access control
+- **User Registration**: Self-service account creation with email validation
+- **Role-Based Permissions**: Admin, Manager, and User roles with appropriate access levels
+- **User Dashboard**: Personalized view of meetings, tasks, and analytics
+- **Profile Management**: User settings and preferences management
+
+### 📊 Personal User Dashboard
+- **Meeting Overview**: View all meetings you've participated in or organized
+- **Task Management**: Track assigned tasks with status updates (Pending → In Progress → Completed)
+- **Meeting Details Modal**: Comprehensive view of meeting analysis, action items, and insights
+- **Interactive Task Updates**: One-click status changes with real-time updates
+- **Meeting Analytics**: Personal statistics and productivity insights
+
+### 📧 Professional Email System
+- **Multi-Stakeholder Support**: Generate tailored emails for different audience types:
+  - **Executive Summary**: High-level insights for leadership
+  - **Team Detailed**: Comprehensive updates for team members
+  - **Action Items**: Task-focused communication with clear responsibilities
+  - **External Stakeholder**: Professional communication for external parties
+- **Email Editing Interface**: Full WYSIWYG editor for customizing generated content
+- **SendGrid Integration**: Professional email delivery with tracking capabilities
+- **Delivery Analytics**: Real-time tracking of email opens, clicks, and engagement
+
+### 🏢 Admin Management Portal
+- **Comprehensive Admin Dashboard**: Full system oversight and management
+- **User Management**: Create, edit, delete, and manage user accounts and roles
+- **Meeting Management**: View all meetings, participants, and detailed analytics
+- **Email Analytics**: Track email performance, delivery rates, and engagement metrics
+- **Project Management**: Organize meetings into projects for better tracking
+- **System Statistics**: Real-time metrics and performance monitoring
+
+### 📋 Project Management System
+- **Project Creation & Management**: Organize meetings under strategic projects
+- **Meeting-Project Linking**: Associate meetings with relevant projects for better organization
+- **Project Status Tracking**: Monitor project progress (Active, Completed, On Hold, Cancelled)
+- **Timeline Management**: Set project start and end dates with milestone tracking
+- **Project Analytics**: View meeting history and outcomes per project
+
+### 📈 Advanced Analytics & Tracking
+- **Email Tracking**: Comprehensive delivery, open, and click tracking
+- **User Analytics**: Meeting participation and task completion statistics
+- **System Metrics**: Performance monitoring and usage analytics
+- **Engagement Insights**: Detailed analysis of user interaction patterns
+- **Exportable Reports**: Generate and download analytics reports
+
+## 🏗️ Technical Architecture
+
+### Backend (FastAPI + Python)
+```
+backend/
+├── web_app.py                    # Main FastAPI application with all endpoints
+├── meeting_analyzer.py           # AI-powered meeting analysis engine
+├── auth.py                      # JWT authentication and user management
+├── user_db.py                   # Database operations and models
+├── models.py                    # Pydantic data models and validation
+├── database.py                  # Email tracking database operations
+├── prompts/                     # AI prompts and templates
+│   ├── __init__.py
+│   ├── analysis_prompts.py      # Meeting analysis prompts
+│   ├── email_prompts.py         # Email generation prompts
+│   ├── system_prompts.py        # System-level prompts
+│   └── utils.py                 # Prompt utilities
+└── static/                      # Static assets
+```
+
+### Frontend (React + Bootstrap)
+```
+frontend/
+├── package.json                 # Dependencies and scripts
+├── public/                      # Static assets
+│   ├── index.html
+│   └── manifest.json
+└── src/
+    ├── App.js                   # Main application router
+    ├── index.js                 # React entry point
+    ├── components/              # Reusable components
+    │   ├── AuthPage.js          # Login/register interface
+    │   ├── EmailComposer.js     # Email creation and editing
+    │   ├── EmailGeneration.js   # Email generation interface
+    │   ├── MeetingResults.js    # Meeting analysis display
+    │   ├── Navbar.js            # Navigation component
+    │   ├── TranscriptInput.js   # Meeting input interface
+    │   └── UserDashboard.js     # Personal dashboard
+    ├── pages/                   # Main application pages
+    │   ├── Admin.js             # Admin management portal
+    │   └── Home.js              # Main analysis interface
+    └── contexts/                # React context providers
+        ├── ApiContext.js        # API calls and state management
+        └── AuthContext.js       # Authentication state management
+```
+
+## 🚀 Quick Start Guide
+
+### Prerequisites
+- **Python 3.8+** with pip
+- **Node.js 16+** with npm
+- **OpenAI API Key** (GPT-4 access recommended)
+- **SendGrid API Key** (for email functionality)
+
+### 1. Environment Setup
+Create `.env` file in the backend directory:
+```bash
+# AI Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# Email Configuration
+SENDGRID_API_KEY=your_sendgrid_api_key_here
+SENDER_EMAIL=noreply@yourdomain.com
+SENDER_NAME=Minumate Bot
+
+# Security
+JWT_SECRET_KEY=your_secret_key_here
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+### 2. Backend Installation
+```bash
+cd backend
+pip install -r requirements.txt
+python web_app.py
+```
+Backend runs on `http://localhost:8000`
+
+### 3. Frontend Installation
+```bash
+cd frontend
+npm install
+npm start
+```
+Frontend runs on `http://localhost:3000`
+
+### 4. Access the Application
+- **Main Application**: http://localhost:3000
+- **Admin Portal**: Login as admin and access via navigation
+- **API Documentation**: http://localhost:8000/docs
+
+## 🔐 User Roles & Permissions
+
+### User Role
+- Access personal dashboard
+- View assigned meetings and tasks
+- Update task status
+- Generate and send emails from meetings
+- View meeting analysis and details
+
+### Admin Role
+- All user permissions
+- Manage all users (create, edit, delete)
+- View all meetings system-wide
+- Access email analytics and tracking
+- Manage projects and meeting associations
+- System configuration and monitoring
+
+### Manager Role (Future Enhancement)
+- Team management capabilities
+- Department-level analytics
+- Project oversight functions
+
+## 📊 API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get current user info
+
+### Meeting Analysis
+- `POST /api/analyze` - Analyze meeting transcript
+- `POST /send_email` - Send generated emails
+- `GET /email_status/{tracking_id}` - Check email delivery status
+
+### User Management
+- `GET /api/user/meetings` - Get user's meetings
+- `GET /api/user/tasks` - Get user's tasks
+- `PUT /api/user/tasks/{task_id}` - Update task status
+- `GET /api/user/meetings/{meeting_id}` - Get detailed meeting info
+
+### Admin Endpoints
+- `GET /api/admin/users` - Manage all users
+- `GET /api/admin/meetings` - View all meetings
+- `GET /api/admin/projects` - Manage projects
+- `POST /api/admin/projects` - Create new project
+- `GET /admin/api/emails` - Email tracking analytics
+
+### Project Management
+- `GET /api/admin/projects/{project_id}` - Get project details
+- `POST /api/admin/projects/{project_id}/meetings/{meeting_id}` - Link meeting to project
+- `DELETE /api/admin/projects/{project_id}/meetings/{meeting_id}` - Unlink meeting
+
+## 🎨 User Interface Features
+
+### Modern React Design
+- **Responsive Layout**: Mobile-first design with Bootstrap 5
+- **Interactive Components**: Real-time updates and notifications
+- **Toast Notifications**: User feedback for all actions
+- **Modal Interfaces**: Clean, focused interaction patterns
+- **Loading States**: Clear progress indicators
+- **Error Handling**: Graceful error management and recovery
+
+### Accessibility Features
+- **Keyboard Navigation**: Full keyboard accessibility
+- **Screen Reader Support**: ARIA labels and semantic HTML
+- **Color Contrast**: WCAG-compliant color schemes
+- **Focus Management**: Clear focus indicators
+- **Responsive Text**: Scalable font sizes
+
+## 🔧 Configuration Options
+
+### AI Settings
+- **Model Selection**: Choose between GPT-4 and GPT-4-turbo
+- **Temperature Control**: Adjust creativity vs consistency (0.3-0.7)
+- **Max Tokens**: Configure response length limits
+- **Prompt Customization**: Modify analysis and email prompts
+
+### Email Settings
+- **Tracking Options**: Enable/disable open and click tracking
+- **Template Customization**: Modify email templates and styling
+- **Delivery Options**: Configure retry policies and timeouts
+- **Sender Configuration**: Set custom sender names and addresses
+
+### System Settings
+- **Database Configuration**: SQLite database path and settings
+- **Logging Levels**: Configure application logging detail
+- **Session Management**: JWT token expiration and refresh policies
+- **Rate Limiting**: API request throttling and abuse prevention
+
+## 📈 Analytics & Insights
+
+### Meeting Analytics
+- **Participation Tracking**: Who attends which meetings
+- **Task Completion Rates**: Individual and team productivity metrics
+- **Meeting Frequency**: Trends and patterns analysis
+- **Action Item Trends**: Task generation and completion patterns
+
+### Email Performance
+- **Delivery Rates**: Success/failure statistics
+- **Engagement Metrics**: Open rates, click rates, response rates
+- **Content Analysis**: Most effective email types and formats
+- **Recipient Behavior**: User interaction patterns
+
+### System Performance
+- **Response Times**: API endpoint performance monitoring
+- **Error Rates**: System reliability metrics
+- **User Activity**: Login patterns and feature usage
+- **Resource Usage**: Server performance and optimization insights
+
+## 🔄 Workflow Examples
+
+### Standard Meeting Analysis Workflow
+1. **Input**: Upload transcript or paste meeting content
+2. **Analysis**: AI processes content and extracts insights
+3. **Review**: User reviews generated analysis and action items
+4. **Email Generation**: Create stakeholder-specific communications
+5. **Distribution**: Send emails with tracking enabled
+6. **Follow-up**: Monitor delivery and engagement metrics
+
+### Project Management Workflow
+1. **Project Creation**: Admin creates project with timeline
+2. **Meeting Association**: Link relevant meetings to project
+3. **Progress Tracking**: Monitor meeting outcomes and decisions
+4. **Report Generation**: Export project analytics and insights
+5. **Team Coordination**: Share project updates with stakeholders
+
+### Task Management Workflow
+1. **Automatic Generation**: AI extracts tasks from meeting transcripts
+2. **Assignment**: Tasks automatically assigned based on discussion context
+3. **Notification**: Users notified of new task assignments
+4. **Progress Updates**: Users update task status through dashboard
+5. **Completion Tracking**: Analytics track completion rates and patterns
+
+## 🚀 Production Deployment
+
+### Docker Deployment (Recommended)
+```bash
+# Build and run with Docker Compose
+docker-compose up -d
+```
+
+### Manual Deployment
+```bash
+# Build frontend
+cd frontend && npm run build
+
+# Install backend dependencies
+cd backend && pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+
+# Start production server
+uvicorn web_app:app --host 0.0.0.0 --port 8000
+```
+
+### Environment Configuration
+- **Database**: Configure PostgreSQL for production (SQLite for development)
+- **Security**: Set strong JWT secrets and HTTPS certificates
+- **Monitoring**: Integrate with logging and monitoring solutions
+- **Backup**: Implement regular database backup strategies
+
+## 🔒 Security Features
+
+### Authentication Security
+- **JWT Tokens**: Secure, stateless authentication
+- **Password Hashing**: Bcrypt with salt for password security
+- **Role-Based Access**: Granular permissions system
+- **Session Management**: Automatic token expiration and refresh
+
+### Data Security
+- **Input Validation**: Comprehensive request validation
+- **SQL Injection Prevention**: Parameterized queries and ORM usage
+- **XSS Protection**: Input sanitization and output encoding
+- **CORS Configuration**: Restricted cross-origin requests
+
+### Privacy Protection
+- **Data Encryption**: Sensitive data encryption at rest
+- **Audit Logging**: Comprehensive activity logging
+- **Access Controls**: Fine-grained permission management
+- **Data Retention**: Configurable data retention policies
+
+## 📝 Sample Usage
+
+### Meeting Analysis Example
+```python
+# API call to analyze meeting
+POST /api/analyze
+{
+    "transcript": "Meeting transcript content...",
+    "meeting_title": "Q4 Planning Session",
+    "participants": ["John Smith (PM)", "Sarah Johnson (Dev)", "Mike Davis (Design)"]
+}
+
+# Response includes:
+{
+    "analysis": {
+        "executive_summary": "Key insights and outcomes...",
+        "action_items": [...],
+        "key_decisions": [...],
+        "next_steps": [...],
+        "risks_concerns": [...]
+    },
+    "meeting_id": 123,
+    "participants": [...]
+}
+```
+
+### Email Generation Example
+```python
+# Generate stakeholder email
+POST /send_email
+{
+    "recipient_email": "stakeholder@company.com",
+    "email_type": "executive_summary",
+    "meeting_analysis": {...},
+    "custom_message": "Additional context...",
+    "enable_tracking": true
+}
+```
+
+## 🤝 Contributing
+
+### Development Setup
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Make changes and test thoroughly
+4. Commit changes: `git commit -m 'Add amazing feature'`
+5. Push to branch: `git push origin feature/amazing-feature`
+6. Create Pull Request with detailed description
+
+### Coding Standards
+- **Python**: Follow PEP 8 guidelines with black formatting
+- **JavaScript**: Use ESLint with Prettier for consistent formatting
+- **Documentation**: Update README and inline documentation
+- **Testing**: Add unit tests for new functionality
+
+## 📞 Support & Documentation
+
+### Getting Help
+- **Issues**: Report bugs and feature requests via GitHub Issues
+- **Documentation**: Comprehensive API docs at `/docs` endpoint
+- **Community**: Join discussions and share feedback
+
+### Troubleshooting
+- **Database Issues**: Check SQLite file permissions and path
+- **API Errors**: Verify environment variables and API keys
+- **Frontend Issues**: Clear browser cache and check console errors
+- **Email Problems**: Verify SendGrid configuration and domain settings
+
+## 📄 License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🎉 Acknowledgments
+- OpenAI for GPT-4 API access
+- SendGrid for email delivery infrastructure
+- React and FastAPI communities for excellent frameworks
+- Bootstrap team for responsive design components
+
+---
+
+**Version**: 2.0.0  
+**Last Updated**: August 16, 2025  
+**Developed by**: Minumate Team
+
+For the latest updates and detailed documentation, visit our GitHub repository.
 ## Project Structure
 ```
 Assignment04/
@@ -98,7 +478,7 @@ npm start
 ```
  
 React dev server runs on `http://localhost:3000`
-FastAPI backend runs on `http://localhost:8002`
+FastAPI backend runs on `http://localhost:8000`
  
 ### 4. Production Deployment
 ```bash
@@ -111,7 +491,7 @@ cd ..
 python web_app.py
 ```
  
-**Admin Dashboard:** Access email tracking at `http://localhost:8002/admin`
+**Admin Dashboard:** Access email tracking at `http://localhost:8000/admin`
  
 ### 4. Using the Application
  
@@ -215,7 +595,7 @@ Each email gets a unique tracking ID that enables:
 **Status Monitoring:**
 ```bash
 # Check specific email status
-curl http://localhost:8002/email_status/{tracking_id}
+curl http://localhost:8000/email_status/{tracking_id}
 ```
  
 **Event Recording:**

@@ -29,7 +29,7 @@ const UserDashboard = () => {
 
       // Load user meetings
       console.log('📅 Fetching user meetings...');
-      const meetingsResponse = await fetch('http://localhost:8002/api/user/meetings', { headers });
+      const meetingsResponse = await fetch('http://localhost:8000/api/user/meetings', { headers });
       console.log('📅 Meetings response status:', meetingsResponse.status);
       
       if (meetingsResponse.ok) {
@@ -42,7 +42,7 @@ const UserDashboard = () => {
 
       // Load user tasks
       console.log('📋 Fetching user tasks...');
-      const tasksResponse = await fetch('http://localhost:8002/api/user/tasks', { headers });
+      const tasksResponse = await fetch('http://localhost:8000/api/user/tasks', { headers });
       console.log('📋 Tasks response status:', tasksResponse.status);
       
       if (tasksResponse.ok) {
@@ -64,7 +64,7 @@ const UserDashboard = () => {
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8002/api/user/tasks/${taskId}`, {
+      const response = await fetch(`http://localhost:8000/api/user/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -89,7 +89,7 @@ const UserDashboard = () => {
     setLoadingMeetingDetails(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8002/api/user/meetings/${meeting.id}`, {
+      const response = await fetch(`http://localhost:8000/api/user/meetings/${meeting.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

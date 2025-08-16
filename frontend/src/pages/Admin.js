@@ -4,6 +4,119 @@ import { useApi } from '../contexts/ApiContext';
 import { toast } from 'react-toastify';
 import moment from 'moment';
 import EmailComposer from '../components/EmailComposer';
+
+// Project Form Component
+const ProjectForm = ({ project, onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    status: 'active',
+    start_date: '',
+    end_date: ''
+  });
+
+  useEffect(() => {
+    if (project) {
+      setFormData({
+        name: project.name || '',
+        description: project.description || '',
+        status: project.status || 'active',
+        start_date: project.start_date ? project.start_date.split('T')[0] : '',
+        end_date: project.end_date ? project.end_date.split('T')[0] : ''
+      });
+    }
+  }, [project]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  const handleChange = (e) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  return (
+    <Form onSubmit={handleSubmit}>
+      <Row>
+        <Col md={6}>
+          <Form.Group className="mb-3">
+            <Form.Label>Project Name *</Form.Label>
+            <Form.Control
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              placeholder="Enter project name"
+            />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group className="mb-3">
+            <Form.Label>Status</Form.Label>
+            <Form.Select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+            >
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="on_hold">On Hold</option>
+              <option value="cancelled">Cancelled</option>
+            </Form.Select>
+          </Form.Group>
+        </Col>
+      </Row>
+      <Row>
+        <Col md={6}>
+          <Form.Group className="mb-3">
+            <Form.Label>Start Date</Form.Label>
+            <Form.Control
+              type="date"
+              name="start_date"
+              value={formData.start_date}
+              onChange={handleChange}
+            />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group className="mb-3">
+            <Form.Label>End Date</Form.Label>
+            <Form.Control
+              type="date"
+              name="end_date"
+              value={formData.end_date}
+              onChange={handleChange}
+            />
+          </Form.Group>
+        </Col>
+      </Row>
+      <Form.Group className="mb-3">
+        <Form.Label>Description</Form.Label>
+        <Form.Control
+          as="textarea"
+          rows={3}
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          placeholder="Enter project description"
+        />
+      </Form.Group>
+      <div className="d-flex justify-content-end gap-2">
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary">
+          {project ? 'Update Project' : 'Create Project'}
+        </Button>
+      </div>
+    </Form>
+  );
+};
  
 const Admin = () => {
   // Email tracking states
@@ -41,6 +154,19 @@ const Admin = () => {
   });
   const [showMeetingDetailsModal, setShowMeetingDetailsModal] = useState(false);
 
+  // Project management states
+  const [projects, setProjects] = useState([]);
+  const [projectLoading, setProjectLoading] = useState(true);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectFilters, setProjectFilters] = useState({
+    search: '',
+    status: ''
+  });
+  const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false);
+  const [showLinkMeetingModal, setShowLinkMeetingModal] = useState(false);
+  const [unlinkedMeetings, setUnlinkedMeetings] = useState([]);
+
   const { 
     getEmailsAdmin, 
     getEmailDetails, 
@@ -54,18 +180,29 @@ const Admin = () => {
     updateMeeting,
     deleteMeeting,
     addMeetingParticipant,
-    removeMeetingParticipant
+    removeMeetingParticipant,
+    // Project management functions
+    getAllProjects,
+    getProjectDetails,
+    createProject,
+    updateProject,
+    deleteProject,
+    linkMeetingToProject,
+    unlinkMeetingFromProject,
+    getUnlinkedMeetings
   } = useApi();
  
   useEffect(() => {
     loadEmails();
     loadUsers();
     loadMeetings();
+    loadProjects();
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       loadEmails();
       loadUsers();
       loadMeetings();
+      loadProjects();
     }, 30000);
     return () => clearInterval(interval);
   }, [emailFilters, currentPage]);
@@ -224,6 +361,123 @@ const Admin = () => {
       } catch (error) {
         toast.error('Failed to delete meeting');
       }
+    }
+  };
+
+  // Project Management Functions
+  const loadProjects = async () => {
+    try {
+      setProjectLoading(true);
+      const data = await getAllProjects();
+      setProjects(data.projects || []);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      toast.error('Failed to load projects');
+    } finally {
+      setProjectLoading(false);
+    }
+  };
+
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch = !projectFilters.search || 
+      project.name.toLowerCase().includes(projectFilters.search.toLowerCase()) ||
+      project.description?.toLowerCase().includes(projectFilters.search.toLowerCase());
+    
+    const matchesStatus = !projectFilters.status || project.status === projectFilters.status;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleCreateProject = async (projectData) => {
+    try {
+      await createProject(projectData);
+      toast.success('Project created successfully');
+      loadProjects();
+      setShowProjectModal(false);
+    } catch (error) {
+      toast.error('Failed to create project');
+    }
+  };
+
+  const handleUpdateProject = async (projectId, projectData) => {
+    try {
+      await updateProject(projectId, projectData);
+      toast.success('Project updated successfully');
+      loadProjects();
+      setShowProjectModal(false);
+    } catch (error) {
+      toast.error('Failed to update project');
+    }
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (window.confirm('Are you sure you want to delete this project? This will also remove all meeting links.')) {
+      try {
+        await deleteProject(projectId);
+        toast.success('Project deleted successfully');
+        loadProjects();
+      } catch (error) {
+        toast.error('Failed to delete project');
+      }
+    }
+  };
+
+  const handleViewProjectDetails = async (project) => {
+    try {
+      const data = await getProjectDetails(project.id);
+      setSelectedProject(data.project);
+      setShowProjectDetailsModal(true);
+    } catch (error) {
+      toast.error('Failed to load project details');
+    }
+  };
+
+  const handleShowLinkMeeting = async (project) => {
+    try {
+      const data = await getUnlinkedMeetings(project.id);
+      setUnlinkedMeetings(data.meetings || []);
+      setSelectedProject(project);
+      setShowLinkMeetingModal(true);
+    } catch (error) {
+      toast.error('Failed to load unlinked meetings');
+    }
+  };
+
+  const handleLinkMeeting = async (meetingId) => {
+    try {
+      await linkMeetingToProject(selectedProject.id, meetingId);
+      toast.success('Meeting linked to project successfully');
+      setShowLinkMeetingModal(false);
+      if (showProjectDetailsModal) {
+        handleViewProjectDetails(selectedProject);
+      }
+    } catch (error) {
+      toast.error('Failed to link meeting to project');
+    }
+  };
+
+  const handleUnlinkMeeting = async (meetingId) => {
+    try {
+      await unlinkMeetingFromProject(selectedProject.id, meetingId);
+      toast.success('Meeting unlinked from project successfully');
+      handleViewProjectDetails(selectedProject);
+    } catch (error) {
+      toast.error('Failed to unlink meeting from project');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getStatusBadgeVariant = (status) => {
+    switch (status) {
+      case 'active': return 'success';
+      case 'completed': return 'primary';
+      case 'on_hold': return 'warning';
+      case 'cancelled': return 'danger';
+      default: return 'secondary';
     }
   };
 
@@ -502,6 +756,131 @@ const Admin = () => {
               <Alert variant="info" className="text-center">
                 <i className="fas fa-info-circle me-2"></i>
                 No meetings found. Try adjusting your filters.
+              </Alert>
+            )}
+          </Tab>
+
+          <Tab eventKey="projects" title={<><i className="fas fa-project-diagram me-2"></i>Project Management</>}>
+            <Row className="mb-4">
+              <Col md={9}>
+                <Row>
+                  <Col md={6}>
+                    <InputGroup className="mb-3">
+                      <InputGroup.Text><i className="fas fa-search"></i></InputGroup.Text>
+                      <Form.Control
+                        type="text"
+                        placeholder="Search projects..."
+                        value={projectFilters.search}
+                        onChange={(e) => setProjectFilters(prev => ({ ...prev, search: e.target.value }))}
+                      />
+                    </InputGroup>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Select
+                      value={projectFilters.status}
+                      onChange={(e) => setProjectFilters(prev => ({ ...prev, status: e.target.value }))}
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                    </Form.Select>
+                  </Col>
+                </Row>
+              </Col>
+              <Col md={3} className="text-end">
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setSelectedProject(null);
+                    setShowProjectModal(true);
+                  }}
+                >
+                  <i className="fas fa-plus me-2"></i>New Project
+                </Button>
+              </Col>
+            </Row>
+
+            {projectLoading ? (
+              <div className="text-center py-5">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : filteredProjects.length > 0 ? (
+              <Table responsive hover>
+                <thead>
+                  <tr>
+                    <th>Project Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created By</th>
+                    <th>Created Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProjects.map((project) => (
+                    <tr key={project.id}>
+                      <td>
+                        <strong>{project.name}</strong>
+                      </td>
+                      <td>{project.description || 'No description'}</td>
+                      <td>
+                        <Badge bg={getStatusBadgeVariant(project.status)}>
+                          {project.status}
+                        </Badge>
+                      </td>
+                      <td>{project.creator_name || 'Unknown'}</td>
+                      <td>{formatDate(project.created_at)}</td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => handleViewProjectDetails(project)}
+                          >
+                            <i className="fas fa-eye me-1"></i>
+                            Details
+                          </Button>
+                          <Button
+                            variant="outline-success"
+                            size="sm"
+                            onClick={() => handleShowLinkMeeting(project)}
+                          >
+                            <i className="fas fa-link me-1"></i>
+                            Link Meeting
+                          </Button>
+                          <Button
+                            variant="outline-warning"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProject(project);
+                              setShowProjectModal(true);
+                            }}
+                          >
+                            <i className="fas fa-edit me-1"></i>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => handleDeleteProject(project.id)}
+                          >
+                            <i className="fas fa-trash me-1"></i>
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <Alert variant="info" className="text-center">
+                <i className="fas fa-info-circle me-2"></i>
+                No projects found. Try adjusting your filters.
               </Alert>
             )}
           </Tab>
@@ -986,6 +1365,193 @@ const Admin = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Project Modal */}
+      <Modal show={showProjectModal} onHide={() => setShowProjectModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {selectedProject ? 'Edit Project' : 'Create New Project'}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <ProjectForm
+            project={selectedProject}
+            onSubmit={selectedProject ? 
+              (data) => handleUpdateProject(selectedProject.id, data) : 
+              handleCreateProject
+            }
+            onCancel={() => setShowProjectModal(false)}
+          />
+        </Modal.Body>
+      </Modal>
+
+      {/* Project Details Modal */}
+      <Modal show={showProjectDetailsModal} onHide={() => setShowProjectDetailsModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="fas fa-project-diagram me-2"></i>
+            Project Details: {selectedProject?.name}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedProject && (
+            <Row>
+              <Col md={6}>
+                <Card className="mb-4">
+                  <Card.Header>
+                    <h6><i className="fas fa-info-circle me-2"></i>Project Information</h6>
+                  </Card.Header>
+                  <Card.Body>
+                    <Table borderless>
+                      <tbody>
+                        <tr>
+                          <td><strong>Name:</strong></td>
+                          <td>{selectedProject.name}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Description:</strong></td>
+                          <td>{selectedProject.description || 'No description'}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Status:</strong></td>
+                          <td>
+                            <Badge bg={getStatusBadgeVariant(selectedProject.status)}>
+                              {selectedProject.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><strong>Created By:</strong></td>
+                          <td>{selectedProject.creator_name || 'Unknown'}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Created Date:</strong></td>
+                          <td>{formatDate(selectedProject.created_at)}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Start Date:</strong></td>
+                          <td>{formatDate(selectedProject.start_date)}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>End Date:</strong></td>
+                          <td>{formatDate(selectedProject.end_date)}</td>
+                        </tr>
+                      </tbody>
+                    </Table>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={6}>
+                <Card>
+                  <Card.Header className="d-flex justify-content-between align-items-center">
+                    <h6><i className="fas fa-calendar-alt me-2"></i>Linked Meetings</h6>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => handleShowLinkMeeting(selectedProject)}
+                    >
+                      <i className="fas fa-plus me-1"></i>
+                      Link Meeting
+                    </Button>
+                  </Card.Header>
+                  <Card.Body style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    {selectedProject.meetings && selectedProject.meetings.length > 0 ? (
+                      selectedProject.meetings.map((meeting) => (
+                        <Card key={meeting.id} className="mb-2" style={{ backgroundColor: '#f8f9fa' }}>
+                          <Card.Body className="p-3">
+                            <div className="d-flex justify-content-between align-items-start">
+                              <div>
+                                <h6 className="mb-1">{meeting.title}</h6>
+                                <small className="text-muted">
+                                  Created by: {meeting.creator_name} | 
+                                  Date: {formatDate(meeting.created_at)} |
+                                  Linked: {formatDate(meeting.linked_at)}
+                                </small>
+                                {meeting.description && (
+                                  <p className="small text-muted mt-1 mb-0">{meeting.description}</p>
+                                )}
+                              </div>
+                              <Button
+                                variant="outline-danger"
+                                size="sm"
+                                onClick={() => handleUnlinkMeeting(meeting.id)}
+                              >
+                                <i className="fas fa-unlink"></i>
+                              </Button>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      ))
+                    ) : (
+                      <Alert variant="info" className="text-center">
+                        <i className="fas fa-info-circle me-2"></i>
+                        No meetings linked to this project yet.
+                      </Alert>
+                    )}
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowProjectDetailsModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Link Meeting Modal */}
+      <Modal show={showLinkMeetingModal} onHide={() => setShowLinkMeetingModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="fas fa-link me-2"></i>
+            Link Meeting to Project: {selectedProject?.name}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {unlinkedMeetings.length > 0 ? (
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {unlinkedMeetings.map((meeting) => (
+                <Card key={meeting.id} className="mb-3" style={{ backgroundColor: '#f8f9fa' }}>
+                  <Card.Body className="p-3">
+                    <div className="d-flex justify-content-between align-items-start">
+                      <div>
+                        <h6 className="mb-1">{meeting.title}</h6>
+                        <small className="text-muted">
+                          Created by: {meeting.creator_name} | Date: {formatDate(meeting.created_at)}
+                        </small>
+                        {meeting.description && (
+                          <p className="small text-muted mt-1 mb-0">{meeting.description}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleLinkMeeting(meeting.id)}
+                      >
+                        <i className="fas fa-link me-1"></i>
+                        Link
+                      </Button>
+                    </div>
+                  </Card.Body>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Alert variant="info" className="text-center">
+              <i className="fas fa-info-circle me-2"></i>
+              All meetings are already linked to this project or no meetings available.
+            </Alert>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowLinkMeetingModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
     </Container>
   );
 };

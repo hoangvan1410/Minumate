@@ -95,6 +95,35 @@ class UserDB:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Create projects table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'active',  -- 'active', 'completed', 'on_hold', 'cancelled'
+                start_date TIMESTAMP,
+                end_date TIMESTAMP,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users (id)
+            )
+        ''')
+
+        # Create project_meetings junction table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS project_meetings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                meeting_id INTEGER NOT NULL,
+                linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+                FOREIGN KEY (meeting_id) REFERENCES meetings (id) ON DELETE CASCADE,
+                UNIQUE(project_id, meeting_id)
+            )
+        ''')
+
         # Create indexes
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)')
@@ -103,6 +132,10 @@ class UserDB:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_meeting_participants_user ON meeting_participants (user_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_meeting ON tasks (meeting_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks (assigned_to)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects (created_by)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_projects_status ON projects (status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_project_meetings_project ON project_meetings (project_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_project_meetings_meeting ON project_meetings (meeting_id)')
 
         conn.commit()
         conn.close()
@@ -893,3 +926,281 @@ class UserDB:
         except Exception as e:
             print(f"Error updating user email: {e}")
             return False
+
+    # Project Management Methods
+    def create_project(self, project_data: Dict) -> Optional[int]:
+        """Create a new project."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO projects (name, description, status, start_date, end_date, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                project_data['name'],
+                project_data.get('description'),
+                project_data.get('status', 'active'),
+                project_data.get('start_date'),
+                project_data.get('end_date'),
+                project_data.get('created_by')
+            ))
+
+            project_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return project_id
+        except Exception as e:
+            print(f"Error creating project: {e}")
+            return None
+
+    def get_all_projects(self) -> List[Dict]:
+        """Get all projects with creator information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT p.id, p.name, p.description, p.status, p.start_date, p.end_date,
+                       p.created_by, p.created_at, p.updated_at, u.full_name as creator_name
+                FROM projects p
+                LEFT JOIN users u ON p.created_by = u.id
+                ORDER BY p.created_at DESC
+            ''')
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'status': row[3],
+                'start_date': row[4],
+                'end_date': row[5],
+                'created_by': row[6],
+                'created_at': row[7],
+                'updated_at': row[8],
+                'creator_name': row[9]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting all projects: {e}")
+            return []
+
+    def get_project_by_id(self, project_id: int) -> Optional[Dict]:
+        """Get project by ID with creator information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT p.id, p.name, p.description, p.status, p.start_date, p.end_date,
+                       p.created_by, p.created_at, p.updated_at, u.full_name as creator_name
+                FROM projects p
+                LEFT JOIN users u ON p.created_by = u.id
+                WHERE p.id = ?
+            ''', (project_id,))
+
+            row = cursor.fetchone()
+            conn.close()
+
+            if row:
+                return {
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'status': row[3],
+                    'start_date': row[4],
+                    'end_date': row[5],
+                    'created_by': row[6],
+                    'created_at': row[7],
+                    'updated_at': row[8],
+                    'creator_name': row[9]
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting project by ID: {e}")
+            return None
+
+    def update_project(self, project_id: int, project_data: Dict) -> bool:
+        """Update project information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Build update query dynamically based on provided fields
+            update_fields = []
+            values = []
+            
+            for field in ['name', 'description', 'status', 'start_date', 'end_date']:
+                if field in project_data:
+                    update_fields.append(f"{field} = ?")
+                    values.append(project_data[field])
+            
+            if not update_fields:
+                return False
+
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(project_id)
+
+            query = f"UPDATE projects SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, values)
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error updating project: {e}")
+            return False
+
+    def delete_project(self, project_id: int) -> bool:
+        """Delete a project and all its meeting associations."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Delete project (project_meetings will be deleted by CASCADE)
+            cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+            
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error deleting project: {e}")
+            return False
+
+    def link_meeting_to_project(self, project_id: int, meeting_id: int) -> bool:
+        """Link a meeting to a project."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT OR IGNORE INTO project_meetings (project_id, meeting_id)
+                VALUES (?, ?)
+            ''', (project_id, meeting_id))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error linking meeting to project: {e}")
+            return False
+
+    def unlink_meeting_from_project(self, project_id: int, meeting_id: int) -> bool:
+        """Unlink a meeting from a project."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                DELETE FROM project_meetings 
+                WHERE project_id = ? AND meeting_id = ?
+            ''', (project_id, meeting_id))
+
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error unlinking meeting from project: {e}")
+            return False
+
+    def get_project_meetings(self, project_id: int) -> List[Dict]:
+        """Get all meetings linked to a project."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT m.id, m.title, m.description, m.created_at, m.created_by,
+                       u.full_name as creator_name, pm.linked_at
+                FROM project_meetings pm
+                JOIN meetings m ON pm.meeting_id = m.id
+                LEFT JOIN users u ON m.created_by = u.id
+                WHERE pm.project_id = ?
+                ORDER BY pm.linked_at DESC
+            ''', (project_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'created_at': row[3],
+                'created_by': row[4],
+                'creator_name': row[5],
+                'linked_at': row[6]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting project meetings: {e}")
+            return []
+
+    def get_meeting_projects(self, meeting_id: int) -> List[Dict]:
+        """Get all projects that a meeting is linked to."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT p.id, p.name, p.description, p.status, p.created_at,
+                       u.full_name as creator_name, pm.linked_at
+                FROM project_meetings pm
+                JOIN projects p ON pm.project_id = p.id
+                LEFT JOIN users u ON p.created_by = u.id
+                WHERE pm.meeting_id = ?
+                ORDER BY pm.linked_at DESC
+            ''', (meeting_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'status': row[3],
+                'created_at': row[4],
+                'creator_name': row[5],
+                'linked_at': row[6]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting meeting projects: {e}")
+            return []
+
+    def get_unlinked_meetings(self, project_id: int) -> List[Dict]:
+        """Get all meetings that are not linked to a specific project."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT m.id, m.title, m.description, m.created_at, m.created_by,
+                       u.full_name as creator_name
+                FROM meetings m
+                LEFT JOIN users u ON m.created_by = u.id
+                WHERE m.id NOT IN (
+                    SELECT meeting_id FROM project_meetings WHERE project_id = ?
+                )
+                ORDER BY m.created_at DESC
+            ''', (project_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'created_at': row[3],
+                'created_by': row[4],
+                'creator_name': row[5]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting unlinked meetings: {e}")
+            return []

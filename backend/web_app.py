@@ -566,7 +566,7 @@ async def send_email(
         final_content = email_content
         if tracking_enabled:
             # Add tracking pixel
-            tracking_pixel = f'<img src="http://localhost:8002/track/open/{tracking_id}" width="1" height="1" style="display:none;" alt="">'
+            tracking_pixel = f'<img src="http://localhost:8000/track/open/{tracking_id}" width="1" height="1" style="display:none;" alt="">'
             final_content = email_content + tracking_pixel
        
         # Format email content with proper HTML
@@ -1064,6 +1064,121 @@ async def create_meeting(
         user_db.add_meeting_participant(meeting_id, participant_id, "participant")
     
     return {"meeting_id": meeting_id, "message": "Meeting created successfully"}
+
+# Project Management endpoints (Admin only)
+@app.get("/api/admin/projects")
+async def get_all_projects(current_user: dict = Depends(get_admin_user)):
+    """Get all projects (Admin only)."""
+    projects = user_db.get_all_projects()
+    return {"projects": projects}
+
+@app.post("/api/admin/projects")
+async def create_project(
+    project_data: dict,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Create a new project (Admin only)."""
+    project_data["created_by"] = current_user["user_id"]
+    project_id = user_db.create_project(project_data)
+    if not project_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create project"
+        )
+    return {"project_id": project_id, "message": "Project created successfully"}
+
+@app.get("/api/admin/projects/{project_id}")
+async def get_project_details(
+    project_id: int, 
+    current_user: dict = Depends(get_admin_user)
+):
+    """Get project details with linked meetings (Admin only)."""
+    project = user_db.get_project_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get linked meetings
+    meetings = user_db.get_project_meetings(project_id)
+    project["meetings"] = meetings
+    
+    return {"project": project}
+
+@app.put("/api/admin/projects/{project_id}")
+async def update_project(
+    project_id: int,
+    project_data: dict,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Update project (Admin only)."""
+    success = user_db.update_project(project_id, project_data)
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update project"
+        )
+    return {"message": "Project updated successfully"}
+
+@app.delete("/api/admin/projects/{project_id}")
+async def delete_project(
+    project_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Delete project (Admin only)."""
+    success = user_db.delete_project(project_id)
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete project"
+        )
+    return {"message": "Project deleted successfully"}
+
+@app.post("/api/admin/projects/{project_id}/meetings/{meeting_id}")
+async def link_meeting_to_project(
+    project_id: int,
+    meeting_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Link a meeting to a project (Admin only)."""
+    success = user_db.link_meeting_to_project(project_id, meeting_id)
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to link meeting to project"
+        )
+    return {"message": "Meeting linked to project successfully"}
+
+@app.delete("/api/admin/projects/{project_id}/meetings/{meeting_id}")
+async def unlink_meeting_from_project(
+    project_id: int,
+    meeting_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Unlink a meeting from a project (Admin only)."""
+    success = user_db.unlink_meeting_from_project(project_id, meeting_id)
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to unlink meeting from project"
+        )
+    return {"message": "Meeting unlinked from project successfully"}
+
+@app.get("/api/admin/projects/{project_id}/unlinked-meetings")
+async def get_unlinked_meetings(
+    project_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Get meetings not linked to this project (Admin only)."""
+    meetings = user_db.get_unlinked_meetings(project_id)
+    return {"meetings": meetings}
+
+@app.get("/api/admin/meetings/{meeting_id}/projects")
+async def get_meeting_projects(
+    meeting_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Get projects linked to a meeting (Admin only)."""
+    projects = user_db.get_meeting_projects(meeting_id)
+    return {"projects": projects}
  
 if __name__ == "__main__":    
     print("\n🚀 Starting Meeting Transcript Analyzer")
@@ -1074,8 +1189,8 @@ if __name__ == "__main__":
     else:
         print("✅ OpenAI API ready")
    
-    print("🌐 Open your browser to: http://localhost:8002")
+    print("🌐 Open your browser to: http://localhost:8000")
     print("📝 Web interface loading...")
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
  
  

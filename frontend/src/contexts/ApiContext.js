@@ -5,7 +5,7 @@ const ApiContext = createContext();
  
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://your-production-domain.com'
-  : 'http://localhost:8002';
+  : 'http://localhost:8000';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -238,6 +238,112 @@ export const ApiProvider = ({ children }) => {
       throw new Error(error.response?.data?.detail || 'Failed to remove participant');
     }
   };
+
+  // Project Management APIs
+  const getAllProjects = async () => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/projects`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting projects:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get projects');
+    }
+  };
+
+  const getProjectDetails = async (projectId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/projects/${projectId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting project details:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get project details');
+    }
+  };
+
+  const createProject = async (projectData) => {
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders() 
+      };
+      const response = await axios.post(`${API_BASE_URL}/api/admin/projects`, projectData, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to create project');
+    }
+  };
+
+  const updateProject = async (projectId, projectData) => {
+    try {
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders() 
+      };
+      const response = await axios.put(`${API_BASE_URL}/api/admin/projects/${projectId}`, projectData, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating project:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to update project');
+    }
+  };
+
+  const deleteProject = async (projectId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.delete(`${API_BASE_URL}/api/admin/projects/${projectId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to delete project');
+    }
+  };
+
+  const linkMeetingToProject = async (projectId, meetingId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.post(`${API_BASE_URL}/api/admin/projects/${projectId}/meetings/${meetingId}`, {}, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error linking meeting to project:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to link meeting to project');
+    }
+  };
+
+  const unlinkMeetingFromProject = async (projectId, meetingId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.delete(`${API_BASE_URL}/api/admin/projects/${projectId}/meetings/${meetingId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error unlinking meeting from project:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to unlink meeting from project');
+    }
+  };
+
+  const getUnlinkedMeetings = async (projectId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/projects/${projectId}/unlinked-meetings`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting unlinked meetings:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get unlinked meetings');
+    }
+  };
+
+  const getMeetingProjects = async (meetingId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/admin/meetings/${meetingId}/projects`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting meeting projects:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get meeting projects');
+    }
+  };
  
   const value = {
     analyzeTranscript,
@@ -259,6 +365,16 @@ export const ApiProvider = ({ children }) => {
     deleteMeeting,
     addMeetingParticipant,
     removeMeetingParticipant,
+    // Project Management
+    getAllProjects,
+    getProjectDetails,
+    createProject,
+    updateProject,
+    deleteProject,
+    linkMeetingToProject,
+    unlinkMeetingFromProject,
+    getUnlinkedMeetings,
+    getMeetingProjects,
     API_BASE_URL
   };
  
