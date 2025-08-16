@@ -12,14 +12,14 @@ const Home = () => {
   const [error, setError] = useState(null);
   const { analyzeTranscriptAjax } = useApi();
  
-  const handleAnalyze = async (transcript) => {
+  const handleAnalyze = async (transcript, projectId = null) => {
     setIsLoading(true);
     setError(null);
     setResults(null);
 
     try {
       // Use the AJAX endpoint that returns participants and personalized emails
-      const data = await analyzeTranscriptAjax(transcript);
+      const data = await analyzeTranscriptAjax(transcript, projectId);
       
       console.log('API Response:', data); // Debug log
      

@@ -1,10 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Alert, FloatingLabel } from 'react-bootstrap';
 import { toast } from 'react-toastify';
+import { useApi } from '../contexts/ApiContext';
  
 const TranscriptInput = ({ onAnalyze, isLoading }) => {
   const [transcript, setTranscript] = useState('');
   const [file, setFile] = useState(null);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const { getAllProjects } = useApi();
+
+  // Load projects on component mount
+  useEffect(() => {
+    const loadProjects = async () => {
+      setLoadingProjects(true);
+      try {
+        const projectData = await getAllProjects();
+        setProjects(projectData || []);
+      } catch (error) {
+        console.error('Error loading projects:', error);
+        toast.error('Failed to load projects');
+      } finally {
+        setLoadingProjects(false);
+      }
+    };
+
+    loadProjects();
+  }, [getAllProjects]);
  
   const handleFileUpload = (event) => {
     const selectedFile = event.target.files[0];
@@ -35,7 +58,7 @@ const TranscriptInput = ({ onAnalyze, isLoading }) => {
       toast.error('Please enter or upload a meeting transcript');
       return;
     }
-    onAnalyze(transcript);
+    onAnalyze(transcript, selectedProject);
   };
  
   const loadSampleData = () => {
@@ -102,6 +125,29 @@ Next meeting: August 16th to review progress and address any blockers.
                 disabled={isLoading}
               />
             </FloatingLabel>
+          </div>
+
+          <div className="mb-3">
+            <FloatingLabel controlId="floatingProjectSelect" label="Link to Project (Optional)">
+              <Form.Select
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                disabled={isLoading || loadingProjects}
+              >
+                <option value="">No project selected</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} - {project.description}
+                  </option>
+                ))}
+              </Form.Select>
+            </FloatingLabel>
+            {loadingProjects && (
+              <Form.Text className="text-muted">
+                <i className="fas fa-spinner fa-spin me-1"></i>
+                Loading projects...
+              </Form.Text>
+            )}
           </div>
  
           <div className="mb-3">

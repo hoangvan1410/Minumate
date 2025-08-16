@@ -38,6 +38,12 @@ const MeetingResults = ({ results }) => {
               <i className="fas fa-check-circle me-2"></i>
               Meeting analyzed successfully! Meeting ID: {results.meeting_id}
             </div>
+            {results.project_info && (
+              <div className="alert alert-info">
+                <i className="fas fa-link me-2"></i>
+                <strong>Linked to Project:</strong> {results.project_info.name} - {results.project_info.description}
+              </div>
+            )}
           </Card.Body>
         </Card>
 

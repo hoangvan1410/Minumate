@@ -364,12 +364,25 @@ const Admin = () => {
     }
   };
 
+  const handleUnlinkMeetingFromProject = async (meetingId, projectId, meetingTitle, projectName) => {
+    if (window.confirm(`Are you sure you want to unlink meeting "${meetingTitle}" from project "${projectName}"?`)) {
+      try {
+        await unlinkMeetingFromProject(projectId, meetingId);
+        toast.success(`Meeting "${meetingTitle}" unlinked from project "${projectName}"`);
+        loadMeetings(); // Refresh the meeting list
+      } catch (error) {
+        console.error('Error unlinking meeting from project:', error);
+        toast.error('Failed to unlink meeting from project');
+      }
+    }
+  };
+
   // Project Management Functions
   const loadProjects = async () => {
     try {
       setProjectLoading(true);
       const data = await getAllProjects();
-      setProjects(data.projects || []);
+      setProjects(data || []);  // Fixed: data is already the projects array
     } catch (error) {
       console.error('Error loading projects:', error);
       toast.error('Failed to load projects');
@@ -696,6 +709,7 @@ const Admin = () => {
                       <tr>
                         <th>Meeting Info</th>
                         <th>Creator</th>
+                        <th>Project</th>
                         <th>Participants</th>
                         <th>Created</th>
                         <th>Actions</th>
@@ -719,6 +733,30 @@ const Admin = () => {
                             </div>
                           </td>
                           <td>{meeting.creator_name}</td>
+                          <td>
+                            {meeting.project_name ? (
+                              <div className="d-flex align-items-center gap-2">
+                                <Badge bg="success" className="me-1">
+                                  <i className="fas fa-project-diagram me-1"></i>
+                                  {meeting.project_name}
+                                </Badge>
+                                <Button
+                                  variant="outline-danger"
+                                  size="sm"
+                                  onClick={() => handleUnlinkMeetingFromProject(meeting.id, meeting.project_id, meeting.title, meeting.project_name)}
+                                  title={`Unlink from ${meeting.project_name}`}
+                                  className="border-0"
+                                >
+                                  <i className="fas fa-unlink" style={{fontSize: '0.75rem'}}></i>
+                                </Button>
+                              </div>
+                            ) : (
+                              <Badge bg="secondary">
+                                <i className="fas fa-minus me-1"></i>
+                                No Project
+                              </Badge>
+                            )}
+                          </td>
                           <td>
                             <Badge bg="info">{meeting.participant_count} participants</Badge>
                           </td>
@@ -1208,6 +1246,22 @@ const Admin = () => {
                     <tr>
                       <td><strong>Created At:</strong></td>
                       <td>{moment(selectedMeeting.created_at).format('LLLL')}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Project:</strong></td>
+                      <td>
+                        {selectedMeeting.project_name ? (
+                          <Badge bg="success">
+                            <i className="fas fa-project-diagram me-1"></i>
+                            {selectedMeeting.project_name}
+                          </Badge>
+                        ) : (
+                          <Badge bg="secondary">
+                            <i className="fas fa-minus me-1"></i>
+                            No Project Linked
+                          </Badge>
+                        )}
+                      </td>
                     </tr>
                   </tbody>
                 </Table>

@@ -36,10 +36,13 @@ export const ApiProvider = ({ children }) => {
   };
 
   // Keep backward compatibility for the old AJAX endpoint
-  const analyzeTranscriptAjax = async (transcript) => {
+  const analyzeTranscriptAjax = async (transcript, projectId = null) => {
     try {
       const formData = new FormData();
       formData.append('transcript', transcript);
+      if (projectId) {
+        formData.append('project_id', projectId);
+      }
      
       const headers = {
         ...getAuthHeaders()
@@ -244,7 +247,7 @@ export const ApiProvider = ({ children }) => {
     try {
       const headers = { ...getAuthHeaders() };
       const response = await axios.get(`${API_BASE_URL}/api/admin/projects`, { headers });
-      return response.data;
+      return response.data.projects || [];  // Extract projects array from response
     } catch (error) {
       console.error('Error getting projects:', error);
       throw new Error(error.response?.data?.detail || 'Failed to get projects');

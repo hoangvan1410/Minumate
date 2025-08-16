@@ -14,7 +14,6 @@ python-jose[cryptography]>=3.3.0
 
 # Email Services
 sendgrid>=6.11.0
-email-validator>=2.0.0
 
 # Configuration and Environment
 python-dotenv>=1.0.1

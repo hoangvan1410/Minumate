@@ -555,7 +555,7 @@ class UserDB:
             return False
 
     def get_all_meetings(self) -> List[Dict]:
-        """Get all meetings with creator and participant information."""
+        """Get all meetings with creator, participant, and project information."""
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -563,12 +563,15 @@ class UserDB:
             cursor.execute('''
                 SELECT m.id, m.title, m.description, m.transcript, m.created_by, 
                        m.created_at, u.full_name as creator_name,
-                       COUNT(mp.user_id) as participant_count
+                       COUNT(DISTINCT mp.user_id) as participant_count,
+                       p.id as project_id, p.name as project_name
                 FROM meetings m
                 LEFT JOIN users u ON m.created_by = u.id
                 LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id
+                LEFT JOIN project_meetings pm ON m.id = pm.meeting_id
+                LEFT JOIN projects p ON pm.project_id = p.id
                 GROUP BY m.id, m.title, m.description, m.transcript, m.created_by, 
-                         m.created_at, u.full_name
+                         m.created_at, u.full_name, p.id, p.name
                 ORDER BY m.created_at DESC
             ''')
 
@@ -583,24 +586,29 @@ class UserDB:
                 'creator_id': row[4],
                 'created_at': row[5],
                 'creator_name': row[6],
-                'participant_count': row[7]
+                'participant_count': row[7],
+                'project_id': row[8],
+                'project_name': row[9]
             } for row in rows]
         except Exception as e:
             print(f"Error getting all meetings: {e}")
             return []
 
     def get_meeting_by_id(self, meeting_id: int) -> Optional[Dict]:
-        """Get meeting by ID with participants."""
+        """Get meeting by ID with participants and project information."""
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            # Get meeting details
+            # Get meeting details with project information
             cursor.execute('''
                 SELECT m.id, m.title, m.description, m.transcript, m.analysis_result, m.created_by, 
-                       m.created_at, u.full_name as creator_name
+                       m.created_at, u.full_name as creator_name,
+                       p.id as project_id, p.name as project_name
                 FROM meetings m
                 LEFT JOIN users u ON m.created_by = u.id
+                LEFT JOIN project_meetings pm ON m.id = pm.meeting_id
+                LEFT JOIN projects p ON pm.project_id = p.id
                 WHERE m.id = ?
             ''', (meeting_id,))
 
@@ -637,6 +645,8 @@ class UserDB:
                 'creator_id': meeting_row[5],
                 'created_at': meeting_row[6],
                 'creator_name': meeting_row[7],
+                'project_id': meeting_row[8],
+                'project_name': meeting_row[9],
                 'participants': [{
                     'id': p[0],
                     'full_name': p[1],

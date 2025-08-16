@@ -430,9 +430,16 @@ async def analyze_meeting_transcript(
 async def analyze_meeting_ajax(
     request: Request, 
     transcript: str = Form(...),
+    project_id: Optional[int] = Form(None),
     current_user: dict = Depends(get_admin_user)
 ):
     """AJAX endpoint to analyze meeting transcript and return JSON results (Admin only)."""
+   
+    # Debug logging
+    print(f"🚀 analyze_meeting_ajax called")
+    print(f"📝 Transcript length: {len(transcript) if transcript else 0}")
+    print(f"🔗 Project ID received: {project_id} (type: {type(project_id)})")
+    print(f"👤 Current user: {current_user.get('user_id', 'Unknown')}")
    
     # Check if API is available
     if analyzer is None:
@@ -480,6 +487,21 @@ async def analyze_meeting_ajax(
             })
         }, current_user["user_id"])
         
+        # Link meeting to project if project_id is provided
+        if meeting_id and project_id:
+            try:
+                print(f"🔗 Attempting to link meeting {meeting_id} to project {project_id}")
+                link_result = user_db.link_meeting_to_project(project_id, meeting_id)
+                print(f"✅ Link result: {link_result}")
+                if link_result:
+                    print(f"🎉 Successfully linked meeting {meeting_id} to project {project_id}")
+                else:
+                    print(f"❌ Failed to link meeting {meeting_id} to project {project_id}")
+            except Exception as e:
+                print(f"⚠️ Exception while linking meeting to project: {e}")
+        else:
+            print(f"⏭️ Skipping project linking - meeting_id: {meeting_id}, project_id: {project_id}")
+        
         # Create tasks from action items but DON'T assign to users yet
         # This will be done later when sending emails
         if meeting_id:
@@ -503,11 +525,20 @@ async def analyze_meeting_ajax(
                 {"name": name, "role": "Participant", "email_preference": "team"}
                 for name in (meeting_data.participants or [])
             ]
+        # Get project information if linked
+        project_info = None
+        if project_id:
+            try:
+                project_info = user_db.get_project(project_id)
+            except Exception as e:
+                print(f"⚠️ Failed to get project info: {e}")
        
         # Return JSON response with meetingId
         return JSONResponse(content={
             "success": True,
             "meeting_id": meeting_id,  # Include meeting_id in response
+            "project_id": project_id,  # Include project_id if linked
+            "project_info": project_info,  # Include project details if linked
             "meeting_data": {
                 "title": meeting_data.title,
                 "date": meeting_data.date,
