@@ -104,6 +104,9 @@ class UserDB:
                 status TEXT DEFAULT 'active',  -- 'active', 'completed', 'on_hold', 'cancelled'
                 start_date TIMESTAMP,
                 end_date TIMESTAMP,
+                tool_type TEXT,
+                tool_project_id TEXT,
+                tool_link TEXT,
                 created_by INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
