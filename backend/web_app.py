@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 import sendgrid
 from sendgrid.helpers.mail import Mail, TrackingSettings, ClickTracking, OpenTracking
 
+from jira_integration import JiraClient
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -33,6 +35,14 @@ import uvicorn
  
 # Create FastAPI app
 app = FastAPI(title="AI Meeting Transcript Analyzer", version="1.0.0")
+
+# Create JIRA Client
+jiraClient = JiraClient(
+    base_url=os.getenv("JIRA_BASE_URL", "https://your-domain.atlassian.net"),
+    email=os.getenv("JIRA_EMAIL", "you@example.com"),
+    api_token=os.getenv("JIRA_API_TOKEN", "YOUR_API_TOKEN")
+)
+
 
 # Add CORS middleware for React development
 app.add_middleware(
@@ -1077,7 +1087,39 @@ async def create_project(
     project_data: dict,
     current_user: dict = Depends(get_admin_user)
 ):
-    """Create a new project (Admin only)."""
+    
+    lead_email = user_db.get_user_by_username(current_user["username"])["email"]
+    """Jira integration"""
+    if project_data["type"] == 'JIRA':
+        try:
+            lead_id = jiraClient.find_account_id_by_email(lead_email)
+            project = jiraClient.create_team_managed_project(
+                name=project_data['name'],
+                lead_account_id=lead_id,
+                project_template_key="com.pyxis.greenhopper.jira:gh-simplified-agility-scrum",
+                description=project_data['description'],
+                start_date=project_data['start_date'],
+                end_date=project_data['end_date']
+            )
+
+            if not project:
+                raise HTTPException(status_code=500, detail="Failed to create project in JIRA")
+                
+            project_data['tool_type'] = 'JIRA';
+            project_data['tool_project_id'] = project['id'];
+            project_data['tool_link'] = project['self'];
+            project_data['name'] = f"[JIRA]{project['id']} - {project_data['name']}"
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"JIRA integration failed: {e}")
+
+    elif project_data["type"] == "TRELLO":
+        # TODO UPDATE
+        ...
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported project type (expected 'JIRA' or 'TRELLO').")
+        
+    """Save project to SQLite."""
     project_data["created_by"] = current_user["user_id"]
     project_id = user_db.create_project(project_data)
     if not project_id:
