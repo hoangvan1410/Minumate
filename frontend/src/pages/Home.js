@@ -20,8 +20,6 @@ const Home = () => {
     try {
       // Use the AJAX endpoint that returns participants and personalized emails
       const data = await analyzeTranscriptAjax(transcript, projectId);
-      
-      console.log('API Response:', data); // Debug log
      
       if (data.success) {
         setResults(data);

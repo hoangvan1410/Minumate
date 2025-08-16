@@ -258,7 +258,6 @@ const EmailGeneration = ({ results }) => {
           
           if (response.success) {
             successCount++;
-            console.log(`Email sent successfully to ${participantName}`);
           } else {
             errorCount++;
             console.error(`Failed to send email to ${participantName}`);

@@ -63,12 +63,35 @@ const Navbar = () => {
                 </>
               )}
               
+              {user?.role === 'manager' && (
+                <>
+                  <Nav.Link
+                    as={Link}
+                    to="/"
+                    active={location.pathname === '/'}
+                    className="nav-item-spacing"
+                  >
+                    <i className="fas fa-microphone me-1"></i>
+                    Analyze
+                  </Nav.Link>
+                  <Nav.Link
+                    as={Link}
+                    to="/manager"
+                    active={location.pathname === '/manager'}
+                    className="nav-item-spacing"
+                  >
+                    <i className="fas fa-project-diagram me-1"></i>
+                    My Projects
+                  </Nav.Link>
+                </>
+              )}
+              
               <NavDropdown
                 title={
                   <span className="user-dropdown-title">
                     <i className="fas fa-user-circle me-2"></i>
                     {user?.full_name}
-                    <Badge bg={user?.role === 'admin' ? 'warning' : 'info'} className="ms-2">
+                    <Badge bg={user?.role === 'admin' ? 'warning' : user?.role === 'manager' ? 'success' : 'info'} className="ms-2">
                       {user?.role}
                     </Badge>
                   </span>

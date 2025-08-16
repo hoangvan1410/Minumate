@@ -22,7 +22,8 @@ from meeting_analyzer import MeetingTranscriptAnalyzer, MeetingData, EmailType
 from database import EmailTrackingDB
 from auth import (
     verify_password, get_password_hash, create_access_token, 
-    get_current_user, get_admin_user, UserRole, create_default_admin_if_not_exists
+    get_current_user, get_admin_user, get_manager_user, get_manager_or_admin_user,
+    UserRole, create_default_admin_if_not_exists
 )
 from user_db import UserDB
 from models import (
@@ -315,7 +316,7 @@ async def home(request: Request):
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze_meeting_transcript(
     analysis_data: TranscriptAnalysis,
-    current_user: dict = Depends(get_admin_user)
+    current_user: dict = Depends(get_manager_or_admin_user)
 ):
     """Analyze meeting transcript (Admin only) and save to database."""
     
@@ -431,9 +432,9 @@ async def analyze_meeting_ajax(
     request: Request, 
     transcript: str = Form(...),
     project_id: Optional[int] = Form(None),
-    current_user: dict = Depends(get_admin_user)
+    current_user: dict = Depends(get_manager_or_admin_user)
 ):
-    """AJAX endpoint to analyze meeting transcript and return JSON results (Admin only)."""
+    """AJAX endpoint to analyze meeting transcript and return JSON results (Manager/Admin only)."""
    
     # Debug logging
     print(f"🚀 analyze_meeting_ajax called")
@@ -1210,6 +1211,52 @@ async def get_meeting_projects(
     """Get projects linked to a meeting (Admin only)."""
     projects = user_db.get_meeting_projects(meeting_id)
     return {"projects": projects}
+
+# Manager API endpoints
+@app.get("/api/manager/projects")
+async def get_manager_projects(current_user: dict = Depends(get_manager_or_admin_user)):
+    """Get projects created by the current manager."""
+    projects = user_db.get_projects_by_user(current_user["user_id"])
+    return {"projects": projects}
+
+@app.get("/api/manager/meetings")
+async def get_manager_meetings(current_user: dict = Depends(get_manager_or_admin_user)):
+    """Get meetings created by the current manager."""
+    meetings = user_db.get_meetings_by_user(current_user["user_id"])
+    return {"meetings": meetings}
+
+@app.get("/api/manager/projects/{project_id}")
+async def get_manager_project_details(
+    project_id: int, 
+    current_user: dict = Depends(get_manager_or_admin_user)
+):
+    """Get specific project details if owned by the current manager or if admin."""
+    project = user_db.get_project_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Check if user owns this project (or is admin)
+    if current_user["role"] != "admin" and project["created_by"] != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
+    return {"project": project}
+
+@app.get("/api/manager/projects/{project_id}/meetings")
+async def get_manager_project_meetings(
+    project_id: int, 
+    current_user: dict = Depends(get_manager_or_admin_user)
+):
+    """Get meetings linked to a specific project if owned by the current manager or if admin."""
+    project = user_db.get_project_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Check if user owns this project (or is admin)
+    if current_user["role"] != "admin" and project["created_by"] != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
+    meetings = user_db.get_project_meetings(project_id)
+    return {"meetings": meetings}
  
 if __name__ == "__main__":    
     print("\n🚀 Starting Meeting Transcript Analyzer")

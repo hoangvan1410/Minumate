@@ -347,6 +347,51 @@ export const ApiProvider = ({ children }) => {
       throw new Error(error.response?.data?.detail || 'Failed to get meeting projects');
     }
   };
+
+  // Manager APIs
+  const getManagerProjects = async () => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/manager/projects`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting manager projects:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get projects');
+    }
+  };
+
+  const getManagerMeetings = async () => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/manager/meetings`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting manager meetings:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get meetings');
+    }
+  };
+
+  const getManagerProjectDetails = async (projectId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/manager/projects/${projectId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting manager project details:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get project details');
+    }
+  };
+
+  const getManagerProjectMeetings = async (projectId) => {
+    try {
+      const headers = { ...getAuthHeaders() };
+      const response = await axios.get(`${API_BASE_URL}/api/manager/projects/${projectId}/meetings`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting manager project meetings:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to get project meetings');
+    }
+  };
  
   const value = {
     analyzeTranscript,
@@ -378,6 +423,11 @@ export const ApiProvider = ({ children }) => {
     unlinkMeetingFromProject,
     getUnlinkedMeetings,
     getMeetingProjects,
+    // Manager APIs
+    getManagerProjects,
+    getManagerMeetings,
+    getManagerProjectDetails,
+    getManagerProjectMeetings,
     API_BASE_URL
   };
  

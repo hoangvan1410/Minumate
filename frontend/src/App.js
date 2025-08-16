@@ -5,6 +5,7 @@ import { Spinner, Container } from 'react-bootstrap';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
+import Manager from './pages/ManagerPage';
 import AuthPage from './components/AuthPage';
 import UserDashboard from './components/UserDashboard';
 import { ApiProvider } from './contexts/ApiContext';
@@ -12,7 +13,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, adminOnly = false }) => {
+const ProtectedRoute = ({ children, adminOnly = false, managerOrAdmin = false }) => {
   const { isAuthenticated, user, loading } = useAuth();
 
   if (loading) {
@@ -33,12 +34,18 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  if (managerOrAdmin && !['admin', 'manager'].includes(user?.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 };
 
 // Helper function to get default route based on user role
 const getDefaultRoute = (user) => {
-  return user?.role === 'admin' ? '/' : '/dashboard';
+  if (user?.role === 'admin') return '/';
+  if (user?.role === 'manager') return '/manager';
+  return '/dashboard';
 };
 
 // Main App Content
@@ -92,6 +99,16 @@ const AppContent = () => {
           element={
             <ProtectedRoute adminOnly={true}>
               <Admin />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Manager Route */}
+        <Route
+          path="/manager"
+          element={
+            <ProtectedRoute managerOrAdmin={true}>
+              <Manager />
             </ProtectedRoute>
           }
         />

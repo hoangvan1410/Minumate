@@ -22,6 +22,7 @@ security = HTTPBearer()
 
 class UserRole(str, Enum):
     ADMIN = "admin"
+    MANAGER = "manager"
     USER = "user"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -88,6 +89,24 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
+        )
+    return current_user
+
+async def get_manager_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ensure the current user is a manager."""
+    if current_user.get("role") != UserRole.MANAGER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manager access required"
+        )
+    return current_user
+
+async def get_manager_or_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ensure the current user is a manager or admin."""
+    if current_user.get("role") not in [UserRole.MANAGER, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manager or Admin access required"
         )
     return current_user
 

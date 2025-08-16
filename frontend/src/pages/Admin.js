@@ -550,6 +550,7 @@ const Admin = () => {
                       >
                         <option value="">All Roles</option>
                         <option value="user">User</option>
+                        <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                       </Form.Select>
                     </Form.Group>
@@ -1173,6 +1174,7 @@ const Admin = () => {
                       onChange={(e) => setSelectedUser(prev => ({ ...prev, role: e.target.value }))}
                     >
                       <option value="user">User</option>
+                      <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
                     </Form.Select>
                   </Form.Group>

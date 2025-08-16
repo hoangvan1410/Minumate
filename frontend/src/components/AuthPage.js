@@ -155,6 +155,7 @@ const AuthPage = () => {
                         onChange={handleChange}
                       >
                         <option value="user">User</option>
+                        <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                       </Form.Select>
                     </Form.Group>

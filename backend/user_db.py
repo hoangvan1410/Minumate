@@ -1214,3 +1214,71 @@ class UserDB:
         except Exception as e:
             print(f"Error getting unlinked meetings: {e}")
             return []
+
+    def get_projects_by_user(self, user_id: int) -> List[Dict]:
+        """Get all projects created by a specific user."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT p.id, p.name, p.description, p.status, p.start_date, p.end_date,
+                       p.created_by, p.created_at, p.updated_at, u.full_name as creator_name
+                FROM projects p
+                LEFT JOIN users u ON p.created_by = u.id
+                WHERE p.created_by = ?
+                ORDER BY p.created_at DESC
+            ''', (user_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'status': row[3],
+                'start_date': row[4],
+                'end_date': row[5],
+                'created_by': row[6],
+                'created_at': row[7],
+                'updated_at': row[8],
+                'creator_name': row[9]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting projects for user {user_id}: {e}")
+            return []
+
+    def get_meetings_by_user(self, user_id: int) -> List[Dict]:
+        """Get all meetings created by a specific user with their project information."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT m.id, m.title, m.description, m.created_at, m.created_by, 
+                       u.full_name as creator_name, p.id as project_id, p.name as project_name
+                FROM meetings m
+                LEFT JOIN users u ON m.created_by = u.id
+                LEFT JOIN project_meetings pm ON m.id = pm.meeting_id
+                LEFT JOIN projects p ON pm.project_id = p.id
+                WHERE m.created_by = ?
+                ORDER BY m.created_at DESC
+            ''', (user_id,))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [{
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'created_at': row[3],
+                'created_by': row[4],
+                'creator_name': row[5],
+                'project_id': row[6],
+                'project_name': row[7]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting meetings for user {user_id}: {e}")
+            return []

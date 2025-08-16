@@ -20,7 +20,6 @@ const UserDashboard = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      console.log('🔑 Loading user data with token:', token?.substring(0, 20) + '...');
       
       const headers = {
         'Authorization': `Bearer ${token}`,
@@ -28,26 +27,20 @@ const UserDashboard = () => {
       };
 
       // Load user meetings
-      console.log('📅 Fetching user meetings...');
       const meetingsResponse = await fetch('http://localhost:8000/api/user/meetings', { headers });
-      console.log('📅 Meetings response status:', meetingsResponse.status);
       
       if (meetingsResponse.ok) {
         const meetingsData = await meetingsResponse.json();
-        console.log('📅 Meetings data:', meetingsData);
         setMeetings(meetingsData.meetings);
       } else {
         console.error('📅 Failed to fetch meetings:', await meetingsResponse.text());
       }
 
       // Load user tasks
-      console.log('📋 Fetching user tasks...');
       const tasksResponse = await fetch('http://localhost:8000/api/user/tasks', { headers });
-      console.log('📋 Tasks response status:', tasksResponse.status);
       
       if (tasksResponse.ok) {
         const tasksData = await tasksResponse.json();
-        console.log('📋 Tasks data:', tasksData);
         setTasks(tasksData.tasks);
       } else {
         console.error('📋 Failed to fetch tasks:', await tasksResponse.text());
@@ -98,12 +91,6 @@ const UserDashboard = () => {
 
       if (response.ok) {
         const meetingDetails = await response.json();
-        console.log('📊 Meeting details received:', meetingDetails);
-        console.log('📈 Analysis data:', meetingDetails.analysis);
-        console.log('� Analysis structure:', JSON.stringify(meetingDetails.analysis, null, 2));
-        console.log('�📋 Tasks data:', meetingDetails.tasks);
-        console.log('📋 Tasks count:', meetingDetails.tasks?.length);
-        console.log('🔍 Full object keys:', Object.keys(meetingDetails));
         setSelectedMeeting(meetingDetails);
         setShowMeetingDetailsModal(true);
       } else {
@@ -282,9 +269,6 @@ const UserDashboard = () => {
         <Modal.Body>
           {selectedMeeting && (
             <>
-              {console.log('🎯 Rendering modal with selectedMeeting:', selectedMeeting)}
-              {console.log('🎯 Analysis exists?', !!selectedMeeting.analysis)}
-              {console.log('🎯 Tasks exists?', !!selectedMeeting.tasks)}
               <Row>
               <Col md={12}>
                 <Card className="mb-4">
