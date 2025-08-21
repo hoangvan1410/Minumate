@@ -216,11 +216,6 @@ class MeetingTranscriptAnalyzer:
                     print(f"❌ All initialization methods failed: {ultimate_error}")
                     raise ultimate_error
         
-        finally:
-            # Restore original proxy environment variables
-            for var, value in original_proxies.items():
-                os.environ[var] = value
-                print(f"🔄 Restored {var} environment variable")
         
         try:
             self.client.chat.completions.create(
