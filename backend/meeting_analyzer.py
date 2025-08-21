@@ -76,7 +76,6 @@ class MeetingTranscriptAnalyzer:
         print(f"🔧 Initializing OpenAI client with base_url: {base_url}")
         
         # Clear any proxy-related environment variables that might interfere
-        import os
         proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
         original_proxies = {}
         for var in proxy_vars:
