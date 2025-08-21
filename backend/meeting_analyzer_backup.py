@@ -113,7 +113,7 @@ class MeetingTranscriptAnalyzer:
                 return MockResponse(response.json())
         
         return DirectOpenAIClient(api_key, base_url)
-
+   
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         """Initialize the analyzer with OpenAI API."""
         api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -156,6 +156,66 @@ class MeetingTranscriptAnalyzer:
             for var, value in original_proxies.items():
                 os.environ[var] = value
                 print(f"🔄 Restored {var} environment variable")
+        
+        # Initialize OpenAI client with minimal parameters
+        try:
+            print(f"🔧 Creating OpenAI client with minimal config...")
+            
+            # Try the most basic initialization first
+            if base_url:
+                # Split the initialization to debug further
+                print(f"🔧 Using custom base_url: {base_url}")
+                
+                # For custom endpoints, try with minimal parameters only
+                self.client = OpenAI(
+                    api_key=api_key,
+                    base_url=base_url
+                )
+            else:
+                print(f"🔧 Using default OpenAI endpoint")
+                self.client = OpenAI(api_key=api_key)
+            print("✅ OpenAI client initialized successfully")
+            
+        except Exception as e:
+            print(f"❌ Error initializing OpenAI client: {e}")
+            print(f"🔍 Error type: {type(e)}")
+            print(f"🔍 Error args: {e.args}")
+            
+            # Try with an older version approach or different parameters
+            try:
+                print("🆘 Attempting alternative initialization...")
+                
+                if base_url:
+                    # Try creating client with only essential parameters for custom endpoints
+                    print(f"� Trying basic custom endpoint initialization...")
+                    
+                    # Some custom endpoints might not support all OpenAI client parameters
+                    self.client = OpenAI(api_key=api_key, base_url=base_url)
+                    
+                else:
+                    # Fallback to basic initialization
+                    self.client = OpenAI(api_key=api_key)
+                    
+                print("✅ OpenAI client initialized with alternative method")
+                
+            except Exception as final_error:
+                print(f"❌ Alternative initialization failed: {final_error}")
+                
+                # Ultimate fallback: try without timeout/retry parameters
+                try:
+                    print("🔧 Final fallback: basic client creation...")
+                    if base_url:
+                        # Create the most basic client possible
+                        import openai
+                        self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
+                    else:
+                        import openai
+                        self.client = openai.OpenAI(api_key=api_key)
+                    print("✅ Basic client creation successful")
+                except Exception as ultimate_error:
+                    print(f"❌ All initialization methods failed: {ultimate_error}")
+                    raise ultimate_error
+        
         
         try:
             self.client.chat.completions.create(
@@ -418,3 +478,5 @@ Meeting Organizer"""
     def _get_email_requirements(self, email_type: EmailType) -> str:
         """Get specific requirements for each email type."""
         return EMAIL_TYPE_REQUIREMENTS.get(email_type.value, "Generate a professional, clear, and actionable email.")
+ 
+ 
