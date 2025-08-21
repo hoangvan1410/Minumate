@@ -92,19 +92,15 @@ class MeetingTranscriptAnalyzer:
             if base_url:
                 # Split the initialization to debug further
                 print(f"🔧 Using custom base_url: {base_url}")
+                
+                # For custom endpoints, try with minimal parameters only
                 self.client = OpenAI(
                     api_key=api_key,
-                    base_url=base_url,
-                    timeout=30.0,
-                    max_retries=3
+                    base_url=base_url
                 )
             else:
                 print(f"🔧 Using default OpenAI endpoint")
-                self.client = OpenAI(
-                    api_key=api_key,
-                    timeout=30.0,
-                    max_retries=3
-                )
+                self.client = OpenAI(api_key=api_key)
             print("✅ OpenAI client initialized successfully")
             
         except Exception as e:
@@ -112,24 +108,40 @@ class MeetingTranscriptAnalyzer:
             print(f"🔍 Error type: {type(e)}")
             print(f"🔍 Error args: {e.args}")
             
-            # Last resort: try importing and using the client differently
+            # Try with an older version approach or different parameters
             try:
-                print("🆘 Attempting last resort initialization...")
-                import openai
-                print(f"🔍 OpenAI library version: {openai.__version__}")
+                print("🆘 Attempting alternative initialization...")
                 
-                # Try setting the API key globally (old style)
-                openai.api_key = api_key
                 if base_url:
-                    openai.api_base = base_url
-                
-                # Create client without any arguments
-                self.client = OpenAI()
-                print("✅ OpenAI client initialized with global settings")
+                    # Try creating client with only essential parameters for custom endpoints
+                    print(f"� Trying basic custom endpoint initialization...")
+                    
+                    # Some custom endpoints might not support all OpenAI client parameters
+                    self.client = OpenAI(api_key=api_key, base_url=base_url)
+                    
+                else:
+                    # Fallback to basic initialization
+                    self.client = OpenAI(api_key=api_key)
+                    
+                print("✅ OpenAI client initialized with alternative method")
                 
             except Exception as final_error:
-                print(f"❌ Final initialization attempt failed: {final_error}")
-                raise final_error
+                print(f"❌ Alternative initialization failed: {final_error}")
+                
+                # Ultimate fallback: try without timeout/retry parameters
+                try:
+                    print("🔧 Final fallback: basic client creation...")
+                    if base_url:
+                        # Create the most basic client possible
+                        import openai
+                        self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
+                    else:
+                        import openai
+                        self.client = openai.OpenAI(api_key=api_key)
+                    print("✅ Basic client creation successful")
+                except Exception as ultimate_error:
+                    print(f"❌ All initialization methods failed: {ultimate_error}")
+                    raise ultimate_error
         
         finally:
             # Restore original proxy environment variables
