@@ -73,11 +73,18 @@ class MeetingTranscriptAnalyzer:
         base_url = base_url or os.getenv("OPENAI_BASE_URL")
         self.model = os.getenv("OPENAI_MODEL", "GPT-4o-mini")
         
-        # Initialize OpenAI client without proxies argument
-        if base_url:
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
-        else:
-            self.client = OpenAI(api_key=api_key)
+        print(f"🔧 Initializing OpenAI client with base_url: {base_url}")
+        
+        # Initialize OpenAI client without proxies argument - Fixed v2
+        try:
+            if base_url:
+                self.client = OpenAI(api_key=api_key, base_url=base_url)
+            else:
+                self.client = OpenAI(api_key=api_key)
+            print("✅ OpenAI client initialized successfully")
+        except Exception as e:
+            print(f"❌ Error initializing OpenAI client: {e}")
+            raise
         
         try:
             self.client.chat.completions.create(
