@@ -38,7 +38,7 @@ app = FastAPI(title="AI Meeting Transcript Analyzer", version="1.0.0")
 # Add CORS middleware for React development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000","https://minumate.vercel.app/"],  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
