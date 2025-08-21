@@ -4,7 +4,7 @@ import axios from 'axios';
 const ApiContext = createContext();
  
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://your-production-domain.com'
+  ? 'https://minumate.onrender.com'
   : 'http://localhost:8000';
 
 // Helper function to get auth headers
