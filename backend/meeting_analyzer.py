@@ -67,6 +67,53 @@ class MeetingSummary:
 class MeetingTranscriptAnalyzer:
     """Production AI-powered meeting transcript analyzer using OpenAI API."""
    
+    def _create_direct_client(self, api_key: str, base_url: str):
+        """Create a direct HTTP client that bypasses proxy issues."""
+        import requests
+        import json
+        
+        class DirectOpenAIClient:
+            def __init__(self, api_key, base_url):
+                self.api_key = api_key
+                self.base_url = base_url.rstrip('/')
+                self.chat = self
+                
+            @property 
+            def completions(self):
+                return self
+                
+            def create(self, **kwargs):
+                url = f"{self.base_url}/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                # Remove any proxy settings from requests
+                session = requests.Session()
+                session.trust_env = False  # Ignore environment proxy settings
+                session.proxies = {}  # Force no proxies
+                
+                response = session.post(url, headers=headers, json=kwargs, timeout=30)
+                response.raise_for_status()
+                
+                # Wrap response to match OpenAI format
+                class MockResponse:
+                    def __init__(self, data):
+                        self.choices = [MockChoice(data['choices'][0])]
+                        
+                class MockChoice:
+                    def __init__(self, choice_data):
+                        self.message = MockMessage(choice_data['message'])
+                        
+                class MockMessage:
+                    def __init__(self, message_data):
+                        self.content = message_data['content']
+                
+                return MockResponse(response.json())
+        
+        return DirectOpenAIClient(api_key, base_url)
+   
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         """Initialize the analyzer with OpenAI API."""
         api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -75,14 +122,40 @@ class MeetingTranscriptAnalyzer:
         
         print(f"🔧 Initializing OpenAI client with base_url: {base_url}")
         
-        # Clear any proxy-related environment variables that might interfere
-        proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
+        # AGGRESSIVE proxy removal for Render environment
+        proxy_vars = [
+            'HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 
+            'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'
+        ]
         original_proxies = {}
+        
+        # Remove ALL proxy-related environment variables
         for var in proxy_vars:
             if var in os.environ:
                 original_proxies[var] = os.environ[var]
                 del os.environ[var]
                 print(f"🧹 Temporarily removed {var} environment variable")
+        
+        try:
+            # For custom endpoints, use direct HTTP client to bypass proxy issues
+            if base_url:
+                print(f"🔧 Using direct HTTP client for custom endpoint: {base_url}")
+                self.client = self._create_direct_client(api_key, base_url)
+                print("✅ Direct HTTP client created successfully")
+            else:
+                print(f"🔧 Using standard OpenAI endpoint")
+                # Clear any requests session proxies
+                import requests
+                requests.Session().trust_env = False
+                
+                self.client = OpenAI(api_key=api_key)
+                print("✅ Standard OpenAI client created successfully")
+                
+        finally:
+            # Restore original proxy environment variables
+            for var, value in original_proxies.items():
+                os.environ[var] = value
+                print(f"🔄 Restored {var} environment variable")
         
         # Initialize OpenAI client with minimal parameters
         try:
