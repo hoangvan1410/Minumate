@@ -3,10 +3,7 @@ import axios from 'axios';
  
 const ApiContext = createContext();
  
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://minumate.onrender.com'
-  : 'http://localhost:8000';
-
+const API_BASE_URL = 'https://minumate.onrender.com'
 // Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
