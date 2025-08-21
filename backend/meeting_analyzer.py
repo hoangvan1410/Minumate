@@ -75,31 +75,68 @@ class MeetingTranscriptAnalyzer:
         
         print(f"🔧 Initializing OpenAI client with base_url: {base_url}")
         
-        # Initialize OpenAI client with explicit parameters only
+        # Clear any proxy-related environment variables that might interfere
+        import os
+        proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
+        original_proxies = {}
+        for var in proxy_vars:
+            if var in os.environ:
+                original_proxies[var] = os.environ[var]
+                del os.environ[var]
+                print(f"🧹 Temporarily removed {var} environment variable")
+        
+        # Initialize OpenAI client with minimal parameters
         try:
-            client_kwargs = {"api_key": api_key}
-            if base_url:
-                client_kwargs["base_url"] = base_url
+            print(f"🔧 Creating OpenAI client with minimal config...")
             
-            print(f"🔧 Client kwargs: {list(client_kwargs.keys())}")
-            self.client = OpenAI(**client_kwargs)
-            print("✅ OpenAI client initialized successfully")
-        except TypeError as e:
-            if "proxies" in str(e):
-                print(f"⚠️ Proxies error detected, trying fallback initialization...")
-                # Fallback: try without any optional parameters
-                try:
-                    self.client = OpenAI(api_key=api_key)
-                    print("✅ OpenAI client initialized with fallback method")
-                except Exception as fallback_error:
-                    print(f"❌ Fallback initialization failed: {fallback_error}")
-                    raise
+            # Try the most basic initialization first
+            if base_url:
+                # Split the initialization to debug further
+                print(f"🔧 Using custom base_url: {base_url}")
+                self.client = OpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=30.0,
+                    max_retries=3
+                )
             else:
-                print(f"❌ Error initializing OpenAI client: {e}")
-                raise
+                print(f"🔧 Using default OpenAI endpoint")
+                self.client = OpenAI(
+                    api_key=api_key,
+                    timeout=30.0,
+                    max_retries=3
+                )
+            print("✅ OpenAI client initialized successfully")
+            
         except Exception as e:
             print(f"❌ Error initializing OpenAI client: {e}")
-            raise
+            print(f"🔍 Error type: {type(e)}")
+            print(f"🔍 Error args: {e.args}")
+            
+            # Last resort: try importing and using the client differently
+            try:
+                print("🆘 Attempting last resort initialization...")
+                import openai
+                print(f"🔍 OpenAI library version: {openai.__version__}")
+                
+                # Try setting the API key globally (old style)
+                openai.api_key = api_key
+                if base_url:
+                    openai.api_base = base_url
+                
+                # Create client without any arguments
+                self.client = OpenAI()
+                print("✅ OpenAI client initialized with global settings")
+                
+            except Exception as final_error:
+                print(f"❌ Final initialization attempt failed: {final_error}")
+                raise final_error
+        
+        finally:
+            # Restore original proxy environment variables
+            for var, value in original_proxies.items():
+                os.environ[var] = value
+                print(f"🔄 Restored {var} environment variable")
         
         try:
             self.client.chat.completions.create(
