@@ -75,13 +75,28 @@ class MeetingTranscriptAnalyzer:
         
         print(f"🔧 Initializing OpenAI client with base_url: {base_url}")
         
-        # Initialize OpenAI client without proxies argument - Fixed v2
+        # Initialize OpenAI client with explicit parameters only
         try:
+            client_kwargs = {"api_key": api_key}
             if base_url:
-                self.client = OpenAI(api_key=api_key, base_url=base_url)
-            else:
-                self.client = OpenAI(api_key=api_key)
+                client_kwargs["base_url"] = base_url
+            
+            print(f"🔧 Client kwargs: {list(client_kwargs.keys())}")
+            self.client = OpenAI(**client_kwargs)
             print("✅ OpenAI client initialized successfully")
+        except TypeError as e:
+            if "proxies" in str(e):
+                print(f"⚠️ Proxies error detected, trying fallback initialization...")
+                # Fallback: try without any optional parameters
+                try:
+                    self.client = OpenAI(api_key=api_key)
+                    print("✅ OpenAI client initialized with fallback method")
+                except Exception as fallback_error:
+                    print(f"❌ Fallback initialization failed: {fallback_error}")
+                    raise
+            else:
+                print(f"❌ Error initializing OpenAI client: {e}")
+                raise
         except Exception as e:
             print(f"❌ Error initializing OpenAI client: {e}")
             raise
