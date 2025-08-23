@@ -102,7 +102,7 @@ class TrelloClient:
     def get_me(self):
         return self._request("GET", "members/me")
 
-    def create_board(self, name: str, default_lists: bool = False, desc: str = None, public: bool = True) -> dict:
+    def create_board(self, name: str, default_lists: bool = False, desc: str = None, public: bool = True, idOrganization: str = None) -> dict:
         params = {
             "name": name,
             "defaultLists": str(default_lists).lower(),
@@ -110,7 +110,18 @@ class TrelloClient:
         }
         if desc:
             params["desc"] = desc
-        return self._request("POST", "boards", params=params)
+        if idOrganization is not None and str(idOrganization).strip():
+            params["idOrganization"] = str(idOrganization).strip()
+        else:
+            # If Trello will create a new workspace, set the workspace name as required
+            params["organizationName"] = "AI Elevate Course Demo"
+        print("[TRELLO][DEBUG] Payload gửi lên Trello khi tạo board:", params)
+        board = self._request("POST", "boards", params=params)
+        print("[TRELLO][DEBUG] Response trả về khi tạo board:", board)
+        # Kiểm tra nếu idOrganization trả về khác với idOrganization truyền vào (nếu có)
+        if idOrganization and board.get("idOrganization") != str(idOrganization).strip():
+            raise TrelloError(f"Trello đã tạo board ở workspace khác! idOrganization gửi: {idOrganization}, idOrganization trả về: {board.get('idOrganization')}")
+        return board
 
     def create_list(self, board_id: str, name: str, pos: str = "bottom") -> dict:
         params = {

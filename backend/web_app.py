@@ -19,7 +19,8 @@ from trello_integrate import TrelloClient
 import os
 
 # Hardcode hoặc lấy từ biến môi trường id workspace Trello mong muốn
-TRELLO_ORG_ID = os.getenv("TRELLO_ORG_ID", "689cbaebf2f5cea77e6f9aa5")
+TRELLO_ORG_ID = os.getenv("TRELLO_ORG_ID", "68a95b4b93544cdb2b50861b")
+TRELLO_ORG_ID = "68a95b4b93544cdb2b50861b"
 # Load environment variables from .env file
 load_dotenv()
 
@@ -486,7 +487,10 @@ async def analyze_meeting_ajax(
                 trello_error = "Trello API credentials missing"
                 raise Exception("Trello API credentials missing")
 
+
+            # Board name lấy đúng từ metadata, không còn prefix "Analyzing meeting:"
             meeting_title = meeting_data.title or 'Meeting Analysis'
+            # Nếu title là "Analyzing meeting: ..." thì lấy phần sau dấu hai chấm, còn không thì lấy nguyên title
             if meeting_title.lower().startswith("analyzing meeting:"):
                 board_name = meeting_title[len("analyzing meeting:"):].strip()
             else:
@@ -516,6 +520,7 @@ async def analyze_meeting_ajax(
                     user_db.update_project(project["id"], {"trello_board_id": board_id})
                 else:
                     print(f"[TRELLO] Creating new Trello board: {board_name} in workspace {TRELLO_ORG_ID}")
+                    # Always use the hardcoded workspace (organization) ID
                     board = trello.create_board(board_name, public=True, idOrganization=TRELLO_ORG_ID)
                     print(f"[TRELLO] create_board result: {board}")
                     board_id = board["id"]
@@ -1537,8 +1542,8 @@ async def analyze_and_create_trello_cards(
                     todo_list = trello.create_list(board_id, "To Do")
                     todo_list_id = todo_list["id"]
             else:
-                # Create Trello board (public)
-                board = trello.create_board(board_name, public=True)
+                # Create Trello board (public) in the hardcoded workspace (organization)
+                board = trello.create_board(board_name, public=True, idOrganization=TRELLO_ORG_ID)
                 board_id = board["id"]
                 # Create lists: To Do, In Progress, Done
                 todo_list = trello.create_list(board_id, "To Do")
