@@ -14,6 +14,7 @@ import uuid
 from datetime import datetime, timedelta
 import sendgrid
 from sendgrid.helpers.mail import Mail, TrackingSettings, ClickTracking, OpenTracking
+from trello_integrate import TrelloClient
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1261,6 +1262,243 @@ async def get_manager_project_meetings(
     meetings = user_db.get_project_meetings(project_id)
     return {"meetings": meetings}
  
+@app.post("/api/analyze_and_create_trello_cards")
+async def analyze_and_create_trello_cards(
+    analysis_data: TranscriptAnalysis,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Analyze meeting transcript, save to DB, and create Trello cards for action items."""
+    if analyzer is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"OpenAI API is not available: {API_ERROR}"
+        )
+    try:
+        meeting_data = MeetingData(transcript=analysis_data.transcript)
+        meeting_summary = analyzer.analyze_transcript(meeting_data)
+
+        # Deduplication: check for existing meeting by title and date
+        meeting_title = analysis_data.meeting_title
+        meeting_date = getattr(meeting_data, 'date', None) or datetime.now().strftime('%Y-%m-%d')
+        existing_meeting = user_db.find_meeting_by_title_and_date(meeting_title, meeting_date)
+        if existing_meeting:
+            meeting_id = existing_meeting['id']
+        else:
+            # Create meeting in database
+            meeting_record = {
+                "title": meeting_title,
+                "description": "Meeting analyzed by AI",
+                "transcript": analysis_data.transcript,
+                "analysis_result": json.dumps({
+                    "executive_summary": meeting_summary.executive_summary,
+                    "key_decisions": meeting_summary.key_decisions,
+                    "action_items": [
+                        {
+                            "task": item.task,
+                            "owner": item.owner,
+                            "due_date": item.due_date,
+                            "priority": item.priority,
+                            "status": item.status
+                        } for item in meeting_summary.action_items
+                    ],
+                    "next_steps": meeting_summary.next_steps,
+                    "risks_concerns": meeting_summary.risks_concerns
+                })
+            }
+            meeting_id = user_db.create_meeting(meeting_record, current_user["user_id"])
+            if not meeting_id:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to save meeting analysis"
+                )
+            # Add participants to meeting
+            for participant_id in analysis_data.participants:
+                user_db.add_meeting_participant(meeting_id, participant_id, "participant")
+
+        # Create tasks from action items (skip if already exists for this meeting and title)
+        created_tasks = []
+        for item in meeting_summary.action_items:
+            assigned_user = None
+            if item.owner:
+                users = user_db.get_all_users()
+                for user in users:
+                    if item.owner.lower() in user["full_name"].lower():
+                        assigned_user = user["id"]
+                        break
+            # Check for existing task with same title for this meeting
+            existing_tasks = user_db.get_meeting_tasks(meeting_id)
+            if any(t["title"] == item.task for t in existing_tasks):
+                continue
+            task_data = {
+                "meeting_id": meeting_id,
+                "assigned_to": assigned_user,
+                "title": item.task,
+                "description": f"Priority: {item.priority}",
+                "due_date": item.due_date,
+                "status": "pending"
+            }
+            task_id = user_db.create_task(task_data)
+            if task_id:
+                created_tasks.append({
+                    "id": task_id,
+                    "title": item.task,
+                    "assigned_to": assigned_user,
+                    "due_date": item.due_date
+                })
+
+        # --- Trello integration: create board/lists if needed, then create cards ---
+        trello = TrelloClient()
+        project = user_db.get_project_by_name(meeting_title)
+        if not project:
+            # Create project in DB
+            project_id = user_db.create_project({
+                "name": meeting_title,
+                "description": f"Project for meeting: {meeting_title}",
+                "created_by": current_user["user_id"]
+            })
+            project = user_db.get_project_by_name(meeting_title)
+        # Check if project has trello_board_id
+        board_id = project.get("trello_board_id")
+        if not board_id:
+            # Check if a board with the same name already exists in Trello
+            existing_board = trello.find_board_by_name(meeting_title)
+            if existing_board:
+                board_id = existing_board["id"]
+                # Save board_id to project
+                user_db.update_project(project["id"], {"trello_board_id": board_id})
+                # Get To Do list id by name
+                lists = trello.get_lists(board_id)
+                todo_list_id = None
+                for l in lists:
+                    if l["name"].strip().lower() == "to do":
+                        todo_list_id = l["id"]
+                        break
+                if not todo_list_id:
+                    todo_list = trello.create_list(board_id, "To Do")
+                    todo_list_id = todo_list["id"]
+            else:
+                # Create Trello board
+                board = trello.create_board(meeting_title)
+                board_id = board["id"]
+                # Create lists: To Do, In Progress, Done
+                todo_list = trello.create_list(board_id, "To Do")
+                inprogress_list = trello.create_list(board_id, "In Progress")
+                done_list = trello.create_list(board_id, "Done")
+                # Save board_id to project
+                user_db.update_project(project["id"], {"trello_board_id": board_id})
+                # Save list ids to project (optional: you can add columns for these if needed)
+                todo_list_id = todo_list["id"]
+        else:
+            # Get To Do list id by name
+            lists = trello.get_lists(board_id)
+            todo_list_id = None
+            for l in lists:
+                if l["name"].strip().lower() == "to do":
+                    todo_list_id = l["id"]
+                    break
+            if not todo_list_id:
+                todo_list = trello.create_list(board_id, "To Do")
+                todo_list_id = todo_list["id"]
+
+        # Deduplicate cards by name in To Do list
+        trello_results = []
+        existing_cards = trello.get_cards_in_list(todo_list_id) or []
+        existing_card_names = {card["name"] for card in existing_cards}
+
+        # Get all labels on the board
+        label_map = {}
+        try:
+            labels = trello.get_labels(board_id)
+            for label in labels:
+                if label.get("name"):
+                    label_map[label["name"].strip().lower()] = label
+        except Exception as e:
+            print(f"Error fetching Trello labels: {e}")
+
+        for item in meeting_summary.action_items:
+            name = item.task
+            if name in existing_card_names:
+                continue
+            desc = f"Owner: {item.owner}\nPriority: {item.priority}\nStatus: {item.status}"
+            due = item.due_date if item.due_date and item.due_date != "TBD" else None
+
+            label_id = None
+            label_name = str(item.priority).strip() if item.priority else None
+            label_color = None
+            trello_label_error = None
+            if label_name:
+                label_key = label_name.lower()
+                label_obj = label_map.get(label_key)
+                if label_obj:
+                    label_id = label_obj["id"]
+                else:
+                    color_map = {"critical": "red", "high": "yellow", "medium": "sky", "low": "green"}
+                    label_color = color_map.get(label_key, "null")
+                    try:
+                        new_label = trello.create_label(board_id, label_name, label_color)
+                        if new_label and new_label.get("id"):
+                            label_id = new_label["id"]
+                            label_map[label_key] = new_label
+                    except Exception as e:
+                        print(f"Error creating Trello label '{label_name}': {e}")
+                        trello_label_error = str(e)
+
+            label_ids = [label_id] if label_id else None
+            try:
+                card = trello.create_card(
+                    list_id=todo_list_id,
+                    name=name,
+                    desc=desc,
+                    due_iso=due,
+                    label_ids=label_ids
+                )
+                card["assigned_label"] = label_name
+                card["label_id"] = label_id
+                card["label_error"] = trello_label_error
+            except Exception as e:
+                print(f"Error creating Trello card '{name}': {e}")
+                card = {"error": str(e), "name": name, "assigned_label": label_name, "label_error": trello_label_error}
+            trello_results.append(card)
+
+        # Update DB: save label info for each task
+        for item in meeting_summary.action_items:
+            tasks = user_db.get_meeting_tasks(meeting_id)
+            for t in tasks:
+                if t["title"] == item.task:
+                    label_info = f"Priority: {item.priority}"
+                    if hasattr(item, "label_id") and item.label_id:
+                        label_info += f", TrelloLabelID: {item.label_id}"
+                    user_db.update_task_description(t["id"], label_info)
+
+        return {
+            "success": True,
+            "meeting_id": meeting_id,
+            "meeting_data": {
+                "title": analysis_data.meeting_title,
+                "description": "Meeting analyzed by AI",
+                "transcript": analysis_data.transcript
+            },
+            "meeting_summary": {
+                "executive_summary": meeting_summary.executive_summary,
+                "key_decisions": meeting_summary.key_decisions,
+                "action_items": [
+                    {
+                        "task": item.task,
+                        "owner": item.owner,
+                        "due_date": item.due_date,
+                        "priority": item.priority,
+                        "status": item.status
+                    } for item in meeting_summary.action_items
+                ],
+                "next_steps": meeting_summary.next_steps,
+                "risks_concerns": meeting_summary.risks_concerns
+            },
+            "trello_cards": trello_results
+        }
+    except Exception as e:
+        print(f"Error analyzing transcript or creating Trello cards: {e}")
+        return {"success": False, "error": str(e)}
+ 
 if __name__ == "__main__":    
     print("\n🚀 Starting Meeting Transcript Analyzer")
     if API_ERROR:
@@ -1273,5 +1511,4 @@ if __name__ == "__main__":
     print(f"🌐 Open your browser to: {SERVER_BASE_URL}")
     print("📝 Web interface loading...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
- 
- 
+

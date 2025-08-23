@@ -10,22 +10,25 @@ const Home = () => {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { analyzeTranscriptAjax } = useApi();
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const { analyzeAndCreateTrelloCards } = useApi();
  
   const handleAnalyze = async (transcript, projectId = null) => {
     setIsLoading(true);
     setError(null);
     setResults(null);
+    setSyncEnabled(false);
 
     try {
-      // Use the AJAX endpoint that returns participants and personalized emails
-      const data = await analyzeTranscriptAjax(transcript, projectId);
-     
+      // Call the new API: analyze, save to DB, and create Trello tasks
+      const data = await analyzeAndCreateTrelloCards(transcript);
+      console.log('API Response:', data);
+
       if (data.success) {
         setResults(data);
-        toast.success('Meeting transcript analyzed successfully!');
-       
-        // Scroll to results
+        setSyncEnabled(true);
+        toast.success('Meeting transcript analyzed and Trello sync successful!');
         setTimeout(() => {
           const resultsElement = document.getElementById('results-section');
           if (resultsElement) {
@@ -33,6 +36,7 @@ const Home = () => {
           }
         }, 100);
       } else {
+        console.error('API Error:', data.error);
         throw new Error(data.error || 'Failed to analyze transcript');
       }
     } catch (error) {
@@ -42,7 +46,32 @@ const Home = () => {
     } finally {
       setIsLoading(false);
     }
-  };  return (
+  };
+
+  const handleSyncTrello = async () => {
+    if (!results || !results.meeting_data || !results.meeting_data.transcript) return;
+    setSyncLoading(true);
+    try {
+      const data = await analyzeAndCreateTrelloCards(
+        results.meeting_data.transcript,
+        results.meeting_data.title || 'Meeting Analysis',
+        []
+      );
+      if (data.success) {
+        setResults(data);
+        toast.success('Synced to Trello successfully!');
+        setSyncEnabled(false);
+      } else {
+        throw new Error(data.error || 'Failed to sync to Trello');
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  return (
     <div>
       <Container className="mt-4">
         {/* Error Alert */}
@@ -52,10 +81,16 @@ const Home = () => {
             <strong>Error:</strong> {error}
           </Alert>
         )}
- 
+
         {/* Transcript Input */}
-        <TranscriptInput onAnalyze={handleAnalyze} isLoading={isLoading} />
- 
+        <TranscriptInput
+          onAnalyze={handleAnalyze}
+          isLoading={isLoading}
+          onSyncTrello={handleSyncTrello}
+          syncLoading={syncLoading}
+          syncEnabled={syncEnabled}
+        />
+
         {/* Results Section */}
         {results && (
           <div id="results-section">
@@ -63,7 +98,7 @@ const Home = () => {
             <EmailGeneration results={results} />
           </div>
         )}
- 
+
         {/* Loading State */}
         {isLoading && (
           <div className="text-center py-5">
@@ -71,7 +106,7 @@ const Home = () => {
             <h5>Analyzing transcript...</h5>
           </div>
         )}
- 
+
         {!results && !isLoading && (
           <div className="card main-card">
             <div className="card-body text-center py-5">
@@ -109,5 +144,4 @@ const Home = () => {
 };
  
 export default Home;
- 
- 
+

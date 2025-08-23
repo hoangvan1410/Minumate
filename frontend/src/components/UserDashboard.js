@@ -3,11 +3,13 @@ import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal 
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../contexts/ApiContext';
 
+
 const UserDashboard = () => {
   const { user } = useAuth();
   const { API_BASE_URL } = useApi();
   const [meetings, setMeetings] = useState([]);
   const [tasks, setTasks] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showMeetingDetailsModal, setShowMeetingDetailsModal] = useState(false);
@@ -138,6 +140,8 @@ const UserDashboard = () => {
           <p className="text-muted">Your personal dashboard</p>
         </Col>
       </Row>
+
+
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError('')}>

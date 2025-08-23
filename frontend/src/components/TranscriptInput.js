@@ -3,7 +3,7 @@ import { Card, Form, Button, Alert, FloatingLabel } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useApi } from '../contexts/ApiContext';
  
-const TranscriptInput = ({ onAnalyze, isLoading }) => {
+const TranscriptInput = ({ onAnalyze, isLoading, onSyncTrello, syncLoading, syncEnabled }) => {
   const [transcript, setTranscript] = useState('');
   const [file, setFile] = useState(null);
   const [selectedProject, setSelectedProject] = useState('');
@@ -188,7 +188,7 @@ Next meeting: August 16th to review progress and address any blockers.
                 </>
               )}
             </Button>
-           
+
             <Button
               variant="outline-primary"
               onClick={loadSampleData}
@@ -197,6 +197,25 @@ Next meeting: August 16th to review progress and address any blockers.
               <i className="fas fa-file-text me-2"></i>
               Load Sample
             </Button>
+
+            {/* <Button
+              variant="success"
+              onClick={onSyncTrello}
+              disabled={!syncEnabled || syncLoading}
+              className="flex-grow-1"
+            >
+              {syncLoading ? (
+                <>
+                  <span className="loading-spinner me-2"></span>
+                  Syncing to Trello...
+                </>
+              ) : (
+                <>
+                  <i className="fab fa-trello me-2"></i>
+                  Sync to Trello
+                </>
+              )}
+            </Button> */}
           </div>
         </Form>
  

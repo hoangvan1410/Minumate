@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Table, Button, Form, Badge, Modal, Alert, Tabs, Tab, InputGroup } from 'react-bootstrap';
+import ProjectDropdown from '../components/ProjectDropdown';
 import { useApi } from '../contexts/ApiContext';
 import { toast } from 'react-toastify';
 import moment from 'moment';
@@ -925,6 +926,12 @@ const Admin = () => {
           </Tab>
           
           <Tab eventKey="analytics" title={<><i className="fas fa-chart-line me-2"></i>Email Analytics</>}>
+            {/* Project Dropdown for Analytics */}
+            <Row className="mb-3">
+              <Col md={6} lg={4}>
+                <ProjectDropdown selectedProject={selectedProject} setSelectedProject={setSelectedProject} />
+              </Col>
+            </Row>
             {/* Statistics Cards */}
             <Row className="mb-4">
               <Col md={3}>

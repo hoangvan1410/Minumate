@@ -6,6 +6,76 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 class UserDB:
+    def get_project_by_name(self, name: str) -> Optional[Dict]:
+        """Get a project by name (case-insensitive)."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, name, description, status, start_date, end_date, created_by, created_at, updated_at
+                FROM projects WHERE LOWER(name) = LOWER(?)
+            ''', (name,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'status': row[3],
+                    'start_date': row[4],
+                    'end_date': row[5],
+                    'created_by': row[6],
+                    'created_at': row[7],
+                    'updated_at': row[8]
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting project by name: {e}")
+            return None
+    def update_task_description(self, task_id: int, description: str) -> bool:
+        """Update the description of a task."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE tasks SET description = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (description, task_id))
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return success
+        except Exception as e:
+            print(f"Error updating task description: {e}")
+            return False
+    def find_meeting_by_title_and_date(self, title: str, date: str) -> Optional[Dict]:
+        """Find a meeting by title and date (for deduplication)."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, title, description, transcript, analysis_result, created_by, created_at
+                FROM meetings
+                WHERE title = ? AND created_at LIKE ?
+                ORDER BY created_at DESC
+            ''', (title, f"{date}%"))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {
+                    'id': row[0],
+                    'title': row[1],
+                    'description': row[2],
+                    'transcript': row[3],
+                    'analysis_result': row[4],
+                    'created_by': row[5],
+                    'created_at': row[6]
+                }
+            return None
+        except Exception as e:
+            print(f"Error finding meeting by title and date: {e}")
+            return None
     def __init__(self, db_path: str = "email_tracking.db"):
         self.db_path = db_path
         self.init_database()
@@ -95,7 +165,7 @@ class UserDB:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
-        # Create projects table
+        # Create projects table (add trello_board_id column)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,11 +175,17 @@ class UserDB:
                 start_date TIMESTAMP,
                 end_date TIMESTAMP,
                 created_by INTEGER,
+                trello_board_id TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (created_by) REFERENCES users (id)
             )
         ''')
+        # Add trello_board_id column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute('ALTER TABLE projects ADD COLUMN trello_board_id TEXT')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         # Create project_meetings junction table
         cursor.execute('''

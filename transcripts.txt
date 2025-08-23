@@ -1,0 +1,57 @@
+Meeting Topic: Launching the "Catch the 9/9 Season" E-commerce Campaign
+Date: 08/02/2025
+Time: 10:00 AM – 10:10 AM
+Attendees:
+
+Trang Nguyen (trang@xyz.com)
+
+Duy Le (duy@xyz.com)
+
+Duc Pham (duc@xyz.com)
+
+
+[10:00] Trang (trang@xyz.com): Good morning everyone, thanks for joining right on time. Let’s jump straight into the main agenda today because we only have 30 minutes. The key focus is to review the progress on the 9/9 campaign rollout, covering marketing assets, website technical readiness, and operational readiness for customer support. I’d like each of you to update on what’s completed so far, any blockers or risks you’ve identified, and proposed mitigation plans. It’s crucial we align closely because this campaign is a major revenue driver, and any missteps could cost us. So please be as detailed as possible.
+
+[10:02] Duy (duy@xyz.com): Thanks, Trang. From the marketing side, I’ve already shared the OKRs and KPIs via email—please check the “9-9 Campaign Metrics” spreadsheet. Our targets remain a conversion rate of at least 4%, ARPU around 350,000 VND, and minimum daily orders of 10,000 units. I’ve segmented our audience targeting mainly between Google Search and TikTok, proposing a budget split of 40% Google and 60% TikTok due to our younger demographic leaning heavily on TikTok. We’re also prepping A/B tests for creatives and subject lines on emails to maximize open and click rates.
+
+[10:04] Duc (duc@xyz.com): From the creative and technical side, the design team has almost finalized six banners, five email templates, and four promotional videos. We’re aiming to complete all assets by August 10th. However, we may face delays on the videos due to additional editing requests to improve engagement. If that happens, I suggest we fallback to GIFs temporarily so that marketing can start previews and tests without waiting. On the tech front, we’re testing UTM parameters and tracking links on the dev environment to ensure accurate data flow for analytics and attribution. QA will begin comprehensive testing of the payment gateway on August 9th to make sure there are no transaction issues during the peak campaign days.
+
+[10:07] Trang (trang@xyz.com): Great, thanks Duy and Duc. I want to highlight the deadline for TikTok audience targeting setup is August 5th, Duy, please prioritize that. We can’t start running ads effectively without that completed. Duc, please coordinate with CRM to feed banner data for customer segmentation tagging. This is important for remarketing campaigns and personalized communications. Also, keep us updated daily on any risks or blockers so we can escalate quickly if needed.
+
+[10:09] Duy (duy@xyz.com): Understood. I’m coordinating with dev to finalize funnel tracking on Google Analytics 4 and TikTok Pixel by tomorrow noon. I’m also working on syncing the audience segments with CRM to enable precise targeting.
+
+[10:10] Duc (duc@xyz.com): QA will test not just payment but also session timeouts and traffic spike handling. We have a fallback plan for auto-extending session times by 5 minutes or switching to proxy CDN if traffic surges unexpectedly.
+
+[10:11] Trang (trang@xyz.com): Perfect. Lastly, I want to remind everyone about the live stream demo scheduled before August 8th to test all features in real time. This will help us catch any user experience glitches or technical bugs before the main event. Everyone must be available for that.
+
+[10:10] Duy (duy@xyz.com): I want to update on the ad budget allocations. We have the total budget capped at 250 million VND. I suggest we allocate 60% for TikTok because of its massive reach among our target younger demographics and 40% for Google Search, which still brings in solid intent-based traffic. For TikTok, we plan to focus on interest and behavior targeting, plus some lookalike audiences based on last campaign data.
+
+[10:12] Duc (duc@xyz.com): On the creative side, we’re working on vertical video ads for TikTok’s in-feed placements, as well as square banners for Google Display Network. We’re also finalizing five email templates in both English and Vietnamese to accommodate our bilingual customer base. The designs will be shared in Figma by tomorrow for review.
+
+[10:13] Trang (trang@xyz.com): Duy, you mentioned A/B testing for email subject lines — have you set a clear timeline for the test phases? Also, what’s the plan if the winning subject line underperforms during the campaign?
+
+[10:14] Duy (duy@xyz.com): The A/B test is scheduled to run from August 3rd to 7th, with results reviewed on the 8th. If the winning subject line fails to perform, we have backup subjects ready to deploy quickly. Also, we’re monitoring open and click rates in real time to pivot messaging if needed.
+
+[10:15] Duc (duc@xyz.com): For tracking, I coordinated with the dev team to ensure that UTM parameters are properly integrated across all links, including those embedded in emails and banners. We’ll do smoke tests by August 5th to verify.
+
+[10:16] Trang (trang@xyz.com): Good. Please coordinate closely with QA to run end-to-end tests on the purchase funnel and payment gateway on August 9th. This is non-negotiable. Any issues found then must be fixed immediately.
+
+[10:17] Duy (duy@xyz.com): Absolutely. Also, for remarketing, I propose we set audience retention windows at 10 days to balance frequency and relevance without causing ad fatigue.
+
+[10:18] Duc (duc@xyz.com): On the tech side, we’re preparing fallback plans in case payment processors hit rate limits or downtime. The DevPro team is ready to increase token thresholds and switch to backup processors if needed.
+
+[10:19] Trang (trang@xyz.com): Thanks, everyone. One more point — please ensure all creative assets have approved tags and are stored in a centralized drive accessible to all relevant teams. We need transparency and quick access in case of urgent changes.
+
+[10:20] Duy (duy@xyz.com): Understood, I’ll maintain version control and send daily status updates.
+
+[10:20] Duc (duc@xyz.com): Regarding the testing phase, QA is preparing comprehensive scripts for the full campaign flow. We’ll be focusing on the payment gateway, user session handling, and tracking accuracy. Testing is scheduled for August 9th to allow for fixes before the campaign launch. We’ll also perform tests on multiple device types, including both Android and iOS platforms, to ensure consistent performance.
+
+[10:22] Trang (trang@xyz.com): On the customer support side, we’re planning to extend hotline hours and add temporary agents for September 9th through 11th to handle the anticipated spike in inquiries. Additionally, we’re updating chatbot scripts to better recognize campaign-related questions and reduce the workload on live agents.
+
+[10:24] Duy (duy@xyz.com): For ad performance monitoring, we’ll implement hourly tracking dashboards showing KPIs like CTR, CPC, and conversion rate to allow real-time optimization. This will help us pivot quickly if a particular creative or channel underperforms.
+
+[10:26] Duc (duc@xyz.com): Also, we’ve set up fallback mechanisms to auto-extend user sessions by 5 minutes during peak load, preventing unexpected logouts which can hurt conversion rates. We’re monitoring server health continuously and ready to switch to proxy CDN if needed.
+
+[10:28] Trang (trang@xyz.com): As a final note, please ensure that all teams update their progress daily in the shared campaign dashboard. Transparency and communication will be key to a smooth execution. Any blockers or risks must be raised immediately so we can resolve them without delay.
+
+[10:30] Duy (duy@xyz.com): Agreed. Thanks everyone for the updates and collaboration. Looking forward to a successful campaign!

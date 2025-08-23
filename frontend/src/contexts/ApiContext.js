@@ -390,9 +390,29 @@ export const ApiProvider = ({ children }) => {
     }
   };
  
+  // Call backend to analyze transcript and create Trello cards
+  const analyzeAndCreateTrelloCards = async (transcript, meetingTitle = "Meeting Analysis", participants = []) => {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      };
+      const response = await axios.post(`${API_BASE_URL}/api/analyze_and_create_trello_cards`, {
+        transcript,
+        meeting_title: meetingTitle,
+        participants
+      }, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing and creating Trello cards:', error);
+      throw new Error(error.response?.data?.detail || 'Failed to analyze and create Trello cards');
+    }
+  };
+ 
   const value = {
     analyzeTranscript,
     analyzeTranscriptAjax,
+    analyzeAndCreateTrelloCards, // <--- add here
     sendEmail,
     getEmailStatus,
     getEmailsAdmin,
