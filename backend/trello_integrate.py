@@ -23,7 +23,11 @@ class TrelloClient:
         member_id = me["id"]
         boards = self._request("GET", f"members/{member_id}/boards")
         for board in boards:
-            if board.get("name", "").strip().lower() == name.strip().lower():
+            # Only consider open boards (closed == False)
+            if (
+                board.get("name", "").strip().lower() == name.strip().lower()
+                and not board.get("closed", False)
+            ):
                 return board
         return None
     """
@@ -98,10 +102,11 @@ class TrelloClient:
     def get_me(self):
         return self._request("GET", "members/me")
 
-    def create_board(self, name: str, default_lists: bool = False, desc: str = None) -> dict:
+    def create_board(self, name: str, default_lists: bool = False, desc: str = None, public: bool = True) -> dict:
         params = {
             "name": name,
-            "defaultLists": str(default_lists).lower()
+            "defaultLists": str(default_lists).lower(),
+            "prefs_permissionLevel": "public" if public else "private"
         }
         if desc:
             params["desc"] = desc

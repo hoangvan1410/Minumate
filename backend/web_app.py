@@ -14,8 +14,12 @@ import uuid
 from datetime import datetime, timedelta
 import sendgrid
 from sendgrid.helpers.mail import Mail, TrackingSettings, ClickTracking, OpenTracking
-from trello_integrate import TrelloClient
 
+from trello_integrate import TrelloClient
+import os
+
+# Hardcode hoặc lấy từ biến môi trường id workspace Trello mong muốn
+TRELLO_ORG_ID = os.getenv("TRELLO_ORG_ID", "689cbaebf2f5cea77e6f9aa5")
 # Load environment variables from .env file
 load_dotenv()
 
@@ -464,6 +468,155 @@ async def analyze_meeting_ajax(
         
         print("✅ Meeting analysis complete")
         print("👥 Extracted participants data:", getattr(meeting_data, 'participants_data', []))
+        # --- Trello integration: create board/lists if needed, then create cards ---
+        trello_error = None
+        trello_results = []
+        try:
+            print("[TRELLO] Initializing TrelloClient...")
+            trello = TrelloClient()
+            # Print out Trello credentials (masked) and base URL if available
+            trello_api_key = getattr(trello, 'api_key', None)
+            trello_token = getattr(trello, 'token', None)
+            trello_base_url = getattr(trello, 'base_url', None)
+            print(f"[TRELLO] API Key: {str(trello_api_key)[:4]}... (masked)")
+            print(f"[TRELLO] Token: {str(trello_token)[:4]}... (masked)")
+            print(f"[TRELLO] Base URL: {trello_base_url}")
+            if not trello_api_key or not trello_token:
+                print("[TRELLO] ERROR: Trello API key or token is missing! Aborting Trello integration.")
+                trello_error = "Trello API credentials missing"
+                raise Exception("Trello API credentials missing")
+
+            meeting_title = meeting_data.title or 'Meeting Analysis'
+            if meeting_title.lower().startswith("analyzing meeting:"):
+                board_name = meeting_title[len("analyzing meeting:"):].strip()
+            else:
+                board_name = meeting_title.strip()
+
+            # Project/board logic
+            print(f"[TRELLO] Looking for project in DB: {board_name}")
+            project = user_db.get_project_by_name(board_name)
+            print(f"[TRELLO] Project from DB: {project}")
+            if not project:
+                print(f"[TRELLO] Project not found, creating new project in DB for board: {board_name}")
+                project_id = user_db.create_project({
+                    "name": board_name,
+                    "description": f"Project for meeting: {board_name}",
+                    "created_by": current_user["user_id"]
+                })
+                project = user_db.get_project_by_name(board_name)
+                print(f"[TRELLO] Created project: {project}")
+            board_id = project.get("trello_board_id")
+            print(f"[TRELLO] Project board_id: {board_id}")
+            if not board_id:
+                print(f"[TRELLO] No board_id in DB, searching Trello for board: {board_name}")
+                existing_board = trello.find_board_by_name(board_name)
+                print(f"[TRELLO] find_board_by_name result: {existing_board}")
+                if existing_board:
+                    board_id = existing_board["id"]
+                    user_db.update_project(project["id"], {"trello_board_id": board_id})
+                else:
+                    print(f"[TRELLO] Creating new Trello board: {board_name} in workspace {TRELLO_ORG_ID}")
+                    board = trello.create_board(board_name, public=True, idOrganization=TRELLO_ORG_ID)
+                    print(f"[TRELLO] create_board result: {board}")
+                    board_id = board["id"]
+                    user_db.update_project(project["id"], {"trello_board_id": board_id})
+            # Always ensure To Do list exists
+            print(f"[TRELLO] Getting lists for board {board_id}")
+            lists = trello.get_lists(board_id)
+            print(f"[TRELLO] get_lists result: {lists}")
+            todo_list_id = None
+            for l in lists:
+                if l["name"].strip().lower() == "to do":
+                    todo_list_id = l["id"]
+                    break
+            if not todo_list_id:
+                print(f"[TRELLO] Creating 'To Do' list on board {board_id}")
+                todo_list = trello.create_list(board_id, "To Do")
+                print(f"[TRELLO] create_list result: {todo_list}")
+                todo_list_id = todo_list["id"]
+
+            # Deduplicate cards by name in To Do list
+            print(f"[TRELLO] Getting cards in list {todo_list_id}")
+            existing_cards = trello.get_cards_in_list(todo_list_id) or []
+            print(f"[TRELLO] get_cards_in_list result: {existing_cards}")
+            existing_card_names = {card["name"] for card in existing_cards}
+
+            # Get all labels on the board
+            label_map = {}
+            try:
+                print(f"[TRELLO] Getting labels for board {board_id}")
+                labels = trello.get_labels(board_id)
+                print(f"[TRELLO] get_labels result: {labels}")
+                for label in labels:
+                    if label.get("name"):
+                        label_map[label["name"].strip().lower()] = label
+            except Exception as e:
+                print(f"Error fetching Trello labels: {e}")
+
+            from dateutil.parser import isoparse
+            def is_valid_iso8601(date_str):
+                if not date_str or date_str == "TBD":
+                    return False
+                try:
+                    isoparse(date_str)
+                    return True
+                except Exception:
+                    return False
+
+            for item in meeting_summary.action_items:
+                name = item.task
+                if name in existing_card_names:
+                    print(f"[TRELLO] Card '{name}' already exists in list, skipping.")
+                    continue
+                desc = f"Owner: {item.owner}\nPriority: {item.priority}\nStatus: {item.status}"
+                due = item.due_date if is_valid_iso8601(item.due_date) else None
+
+                label_id = None
+                label_name = str(item.priority).strip() if item.priority else None
+                label_color = None
+                trello_label_error = None
+                if label_name:
+                    label_key = label_name.lower()
+                    label_obj = label_map.get(label_key)
+                    if label_obj:
+                        label_id = label_obj["id"]
+                        print(f"[TRELLO] Using existing label '{label_name}' with id {label_id}")
+                    else:
+                        color_map = {"critical": "red", "high": "yellow", "medium": "sky", "low": "green"}
+                        label_color = color_map.get(label_key, "null")
+                        try:
+                            print(f"[TRELLO] Creating label '{label_name}' with color '{label_color}'")
+                            new_label = trello.create_label(board_id, label_name, label_color)
+                            print(f"[TRELLO] create_label result: {new_label}")
+                            if new_label and new_label.get("id"):
+                                label_id = new_label["id"]
+                                label_map[label_key] = new_label
+                        except Exception as e:
+                            print(f"Error creating Trello label '{label_name}': {e}")
+                            trello_label_error = str(e)
+
+                label_ids = [label_id] if label_id else None
+                try:
+                    print(f"[TRELLO] Creating card '{name}' in list {todo_list_id} with label_ids={label_ids} and due={due}")
+                    card = trello.create_card(
+                        list_id=todo_list_id,
+                        name=name,
+                        desc=desc,
+                        due_iso=due,
+                        label_ids=label_ids
+                    )
+                    print(f"[TRELLO] create_card result: {card}")
+                    card["assigned_label"] = label_name
+                    card["label_id"] = label_id
+                    card["label_error"] = trello_label_error
+                except Exception as e:
+                    print(f"Error creating Trello card '{name}': {e}")
+                    card = {"error": str(e), "name": name, "assigned_label": label_name, "label_error": trello_label_error}
+                trello_results.append(card)
+            print(f"✅ Trello integration complete. Cards created: {len(trello_results)}")
+        except Exception as e:
+            trello_error = str(e)
+            print(f"❌ Trello integration failed: {e}")
         
         # Generate personalized emails for all participants
         personalized_emails = analyzer.generate_personalized_emails(meeting_summary, meeting_data)
@@ -1277,8 +1430,14 @@ async def analyze_and_create_trello_cards(
         meeting_data = MeetingData(transcript=analysis_data.transcript)
         meeting_summary = analyzer.analyze_transcript(meeting_data)
 
-        # Deduplication: check for existing meeting by title and date
+        # Extract board name from meeting_title, removing any prefix like 'Analyzing meeting:'
         meeting_title = analysis_data.meeting_title
+        # Remove prefix if present
+        if meeting_title.lower().startswith("analyzing meeting:"):
+            board_name = meeting_title[len("analyzing meeting:"):].strip()
+        else:
+            board_name = meeting_title.strip()
+
         meeting_date = getattr(meeting_data, 'date', None) or datetime.now().strftime('%Y-%m-%d')
         existing_meeting = user_db.find_meeting_by_title_and_date(meeting_title, meeting_date)
         if existing_meeting:
@@ -1348,20 +1507,21 @@ async def analyze_and_create_trello_cards(
 
         # --- Trello integration: create board/lists if needed, then create cards ---
         trello = TrelloClient()
-        project = user_db.get_project_by_name(meeting_title)
+        # Use board_name (extracted) for Trello project/board
+        project = user_db.get_project_by_name(board_name)
         if not project:
             # Create project in DB
             project_id = user_db.create_project({
-                "name": meeting_title,
-                "description": f"Project for meeting: {meeting_title}",
+                "name": board_name,
+                "description": f"Project for meeting: {board_name}",
                 "created_by": current_user["user_id"]
             })
-            project = user_db.get_project_by_name(meeting_title)
+            project = user_db.get_project_by_name(board_name)
         # Check if project has trello_board_id
         board_id = project.get("trello_board_id")
         if not board_id:
             # Check if a board with the same name already exists in Trello
-            existing_board = trello.find_board_by_name(meeting_title)
+            existing_board = trello.find_board_by_name(board_name)
             if existing_board:
                 board_id = existing_board["id"]
                 # Save board_id to project
@@ -1377,8 +1537,8 @@ async def analyze_and_create_trello_cards(
                     todo_list = trello.create_list(board_id, "To Do")
                     todo_list_id = todo_list["id"]
             else:
-                # Create Trello board
-                board = trello.create_board(meeting_title)
+                # Create Trello board (public)
+                board = trello.create_board(board_name, public=True)
                 board_id = board["id"]
                 # Create lists: To Do, In Progress, Done
                 todo_list = trello.create_list(board_id, "To Do")
@@ -1415,12 +1575,23 @@ async def analyze_and_create_trello_cards(
         except Exception as e:
             print(f"Error fetching Trello labels: {e}")
 
+
+        from dateutil.parser import isoparse
+        def is_valid_iso8601(date_str):
+            if not date_str or date_str == "TBD":
+                return False
+            try:
+                isoparse(date_str)
+                return True
+            except Exception:
+                return False
+
         for item in meeting_summary.action_items:
             name = item.task
             if name in existing_card_names:
                 continue
             desc = f"Owner: {item.owner}\nPriority: {item.priority}\nStatus: {item.status}"
-            due = item.due_date if item.due_date and item.due_date != "TBD" else None
+            due = item.due_date if is_valid_iso8601(item.due_date) else None
 
             label_id = None
             label_name = str(item.priority).strip() if item.priority else None
