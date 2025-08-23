@@ -35,6 +35,9 @@ import uvicorn
 # Create FastAPI app
 app = FastAPI(title="AI Meeting Transcript Analyzer", version="1.0.0")
 
+# Get server base URL from environment or default to localhost for development
+SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://localhost:8000")
+
 # Add CORS middleware for React development
 app.add_middleware(
     CORSMiddleware,
@@ -598,7 +601,7 @@ async def send_email(
         final_content = email_content
         if tracking_enabled:
             # Add tracking pixel
-            tracking_pixel = f'<img src="http://localhost:8000/track/open/{tracking_id}" width="1" height="1" style="display:none;" alt="">'
+            tracking_pixel = f'<img src="{SERVER_BASE_URL}/track/open/{tracking_id}" width="1" height="1" style="display:none;" alt="">'
             final_content = email_content + tracking_pixel
        
         # Format email content with proper HTML
@@ -1267,7 +1270,7 @@ if __name__ == "__main__":
     else:
         print("✅ OpenAI API ready")
    
-    print("🌐 Open your browser to: http://localhost:8000")
+    print(f"🌐 Open your browser to: {SERVER_BASE_URL}")
     print("📝 Web interface loading...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
  

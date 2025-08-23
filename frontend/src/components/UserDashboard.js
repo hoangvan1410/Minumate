@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal } from 'react-bootstrap';
 import { useAuth } from '../contexts/AuthContext';
+import { useApi } from '../contexts/ApiContext';
 
 const UserDashboard = () => {
   const { user } = useAuth();
+  const { API_BASE_URL } = useApi();
   const [meetings, setMeetings] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +29,7 @@ const UserDashboard = () => {
       };
 
       // Load user meetings
-      const meetingsResponse = await fetch('http://localhost:8000/api/user/meetings', { headers });
+      const meetingsResponse = await fetch(`${API_BASE_URL}/api/user/meetings`, { headers });
       
       if (meetingsResponse.ok) {
         const meetingsData = await meetingsResponse.json();
@@ -37,7 +39,7 @@ const UserDashboard = () => {
       }
 
       // Load user tasks
-      const tasksResponse = await fetch('http://localhost:8000/api/user/tasks', { headers });
+      const tasksResponse = await fetch(`${API_BASE_URL}/api/user/tasks`, { headers });
       
       if (tasksResponse.ok) {
         const tasksData = await tasksResponse.json();
@@ -57,7 +59,7 @@ const UserDashboard = () => {
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/user/tasks/${taskId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/user/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -82,7 +84,7 @@ const UserDashboard = () => {
     setLoadingMeetingDetails(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/user/meetings/${meeting.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/user/meetings/${meeting.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
